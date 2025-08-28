@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Авторизация</title>
+    <link rel="stylesheet" type="text/css" href="/static/css/main.css"
+</head>
+<body>
+    <div id="authContainer">
+        <form id="loginForm" method="post">
+            <h1 class="text-center">Вход</h1>
+
+            {{ if .Message }}
+            <div id="errorMessage">
+                {{.Message}}
+            </div>
+            {{ end }}
+
+            <p>
+                    <input 
+                    type="text" 
+                    id="email" 
+                    name="email"
+                    autofocus
+                    placeholder="Введите ваш email" 
+                    required
+                    size="30"
+                    {{if .Email}}
+                    value="{{.Email}}"
+                    {{end}}
+                >
+                </p>
+                <p>
+                    <input 
+                    type="password" 
+                    id="password" 
+                    name="password" 
+                    placeholder="Введите ваш пароль" 
+                    required
+                    size="30"
+                >
+                </p>
+                <p>
+                    <button type="submit" class="btn-primary btn">Войти</button>
+                </p>
+                <p>
+                    <a href="#">Забыли пароль?</a>
+                    <a href="#">Регистрация</a>
+                </p>
+        </form>
+    </div>
+</body>
+</html>
