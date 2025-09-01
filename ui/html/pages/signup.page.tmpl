@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Регистрация</title>
+    <link rel="stylesheet" type="text/css" href="/static/css/main.css"
+</head>
+<body>
+    <div id="signupContainer">
+        <form id="signupForm" method="post">
+            <h1 class="text-center">Регистрация</h1>
+
+            {{ if .Message }}
+            <div id="errorMessage">
+                {{.Message}}
+            </div>
+            {{ end }}
+
+            <p>
+                    <input 
+                    type="text" 
+                    id="fullname" 
+                    name="fullname"
+                    autofocus
+                    placeholder="ФИО" 
+                    required
+                >
+            </p>
+            <p>
+                    <input 
+                    type="tel" 
+                    id="phone" 
+                    name="phone"
+                    autofocus
+                    placeholder="Номер телефона" 
+                >
+            </p>
+            <p>
+                <select id="role" name="role">
+                <option value="admin">Администратор</option>
+                <option value="prod_manager">Менеджер производства</option>
+                <option value="logistics">Логист</option>
+                <option value="storekeeper">Кладовщик</option>
+                </select>
+            </p>
+            <p>
+                    <input 
+                    type="email" 
+                    id="email" 
+                    name="email"
+                    placeholder="Email" 
+                    required
+                    {{if .Email}}
+                    value="{{.Email}}"
+                    {{end}}
+                >
+            </p>
+            <p>
+                    <input 
+                    type="password" 
+                    id="password" 
+                    name="password" 
+                    placeholder="Придумайте пароль" 
+                    required
+                >
+                </p>
+            <p>
+                <button type="submit" class="btn-primary btn">Создать аккаунт</button>
+            </p>
+        </form>
+    </div>
+</body>
+</html>

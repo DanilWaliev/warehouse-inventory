@@ -11,14 +11,12 @@ func (app *application) auth(w http.ResponseWriter, r *http.Request) (string, er
 	// Проверяем есть ли куки в HTTP запросе
 	cookie, err := r.Cookie("jwt")
 	if err != nil {
-		http.Redirect(w, r, "/signin", http.StatusFound)
 		return "", err
 	}
 
 	// Верификация токена и переадрессация на вход если произошла ошибка
 	claims, err := app.verifyToken(cookie.Value)
 	if err != nil {
-		http.Redirect(w, r, "/signin", http.StatusForbidden)
 		return "", err
 	}
 

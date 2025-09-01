@@ -1,4 +1,4 @@
-/* auth.css */
+/* signup.css */
 body {
     display: flex;
     justify-content: center;
@@ -12,12 +12,12 @@ body {
     color: #c62828;
 }
 
-#authContainer {
+#signupContainer {
     width: 100%;
     max-width: 400px;
 }
 
-#loginForm {
+#signupForm {
     background-color: var(--color-background);
     padding: var(--spacing-6);
     border-radius: var(--border-radius-lg);
@@ -25,17 +25,20 @@ body {
     width: 100%;
 }
 
-#loginForm h1 {
+#signupForm h1 {
     margin-bottom: var(--spacing-6);
     font-size: var(--font-size-2xl);
 }
 
-#loginForm p {
+#signupForm p {
     margin-bottom: var(--spacing-4);
 }
 
-#loginForm input[type="text"],
-#loginForm input[type="password"] {
+#signupForm input[type="text"],
+#signupForm input[type="password"],
+#signupForm input[type="tel"],
+#signupForm input[type="email"],
+#signupForm select {
     width: 100%;
     padding: var(--spacing-4);
     font-size: var(--font-size-base);
@@ -44,14 +47,14 @@ body {
     transition: var(--transition);
 }
 
-#loginForm input[type="text"]:focus,
-#loginForm input[type="password"]:focus {
+#signupForm input[type="text"]:focus,
+#signupForm input[type="password"]:focus {
     outline: none;
     border-color: var(--color-primary);
     box-shadow: 0 0 0 3px rgb(37 99 235 / 0.1);
 }
 
-#loginForm button[type="submit"] {
+#signupForm button[type="submit"] {
     width: 100%;
     padding: var(--spacing-4);
     font-size: var(--font-size-base);
@@ -64,11 +67,11 @@ body {
     transition: var(--transition);
 }
 
-#loginForm button[type="submit"]:hover {
+#signupForm button[type="submit"]:hover {
     background-color: var(--color-primary-hover);
 }
 
-#loginForm a {
+#signupForm a {
     display: inline-block;
     margin-right: var(--spacing-4);
     color: var(--color-primary);
@@ -77,7 +80,7 @@ body {
     transition: var(--transition);
 }
 
-#loginForm a:hover {
+#signupForm a:hover {
     color: var(--color-primary-hover);
     text-decoration: underline;
 }

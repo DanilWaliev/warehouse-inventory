@@ -2,44 +2,27 @@ package main
 
 import (
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
-func (app *application) createToken(login, role string, w http.ResponseWriter) (string, error) {
+func (app *application) createToken(role, fullname string) (string, error) {
 	// Получаем секретный ключ для подписания
 	key := app.JWTkey
 
 	// Карта данных
 	claims := jwt.MapClaims{
-		"login": login,
-		"role":  role,
-		"exp":   time.Now().Add(time.Hour * 24).Unix(),
-		"iat":   time.Now().Unix(),
+		"fullname": fullname,
+		"role":     role,
+		"exp":      time.Now().Add(time.Hour * 24).Unix(),
+		"iat":      time.Now().Unix(),
 	}
 
 	// Создаем токен, подписываем и передаем строку в tokenString
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(key)
-
-	// // Устанаваливаем токен в Cookie
-	// http.SetCookie(w, &http.Cookie{
-	// 	Name:     "jwt",
-	// 	Value:    tokenString,
-	// 	Path:     "/",
-	// 	Expires:  time.Now().Add(24 * time.Hour),
-	// 	Secure:   true,
-	// 	SameSite: http.SameSiteStrictMode,
-	// })
-
-	// // Отправляем HTTP с кодом 200 (ОК) и json с
-	// w.WriteHeader(http.StatusOK)
-	// http.Redirect(w)
-
-	// return nil
 }
 
 // Верификацирует токен и возвращает карту с полезной нагрузкой
