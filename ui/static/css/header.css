@@ -1,0 +1,60 @@
+/* header.css */
+.header-container {
+    justify-content: space-between;
+    align-items: center;
+    background-color: #000000;
+    padding: 0 var(--spacing-4);
+    height: 60px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.nav-menu {
+    float: left;
+    align-items: center;
+    height: 100%;
+}
+
+.nav-button {
+    background: none;
+    color: white;
+    padding: var(--spacing-3) var(--spacing-4);
+    font-weight: 500;
+    height: 100%;
+    border-radius: 0;
+    position: relative;
+    transition: var(--transition);
+}
+
+.nav-button:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.nav-button:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 20px;
+    width: 1px;
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.account-section {
+    float: right;
+    display: flex;
+    height: 100%;
+    align-items: center;
+}
+
+.account-button {
+    background: none;
+    color: white;
+    padding: var(--spacing-3) var(--spacing-4);
+    border-radius: var(--border-radius);
+    transition: var(--transition);
+}
+
+.account-button:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}

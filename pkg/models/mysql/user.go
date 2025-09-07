@@ -3,6 +3,7 @@ package mysql
 import (
 	"database/sql"
 	"errors"
+	"warehouse-inventory/pkg/hash"
 	"warehouse-inventory/pkg/models"
 )
 
@@ -11,7 +12,7 @@ type UserModel struct {
 }
 
 func (m *UserModel) GetByEmail(email string) (*models.User, error) {
-	stmt := `SELECT User_ID, Email, PasswordHash, FullName, Role, Phone, CreatedAt FROM User
+	stmt := `SELECT User_ID, Email, PasswordHash, FullName, Role, Phone, CreatedAt FROM user
 	WHERE Email = ?`
 
 	row := m.DB.QueryRow(stmt, email)
@@ -28,4 +29,39 @@ func (m *UserModel) GetByEmail(email string) (*models.User, error) {
 	}
 
 	return u, nil
+}
+
+func (m *UserModel) ExistsByEmail(email string) (bool, error) {
+	var id int
+
+	stmt := `SELECT User_ID FROM user WHERE Email = ?`
+	err := m.DB.QueryRow(stmt, email).Scan(&id)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+func (m *UserModel) InsertUser(fullname, phone, email, password, role string) error {
+	stmt := `INSERT INTO user(Fullname, Phone, Email, Passwordhash, Role)
+	VALUES (?, ?, ?, ?, ?)`
+
+	passwordHash, err := hash.HashPassword(password)
+
+	if err != nil {
+		return err
+	}
+
+	_, err = m.DB.Exec(stmt, fullname, phone, email, passwordHash, role)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

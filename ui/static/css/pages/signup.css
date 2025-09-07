@@ -1,5 +1,5 @@
 /* signup.css */
-body {
+#signupBody {
     display: flex;
     justify-content: center;
     align-items: center;

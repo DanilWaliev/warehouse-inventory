@@ -4,14 +4,13 @@
   <head>
     <meta charset='utf-8'>
     <title>{{ template "title" .}}</title>
+    <link rel="stylesheet" type="text/css" href="/static/css/main.css">
   </head>
   <body>
-      <header>
-        {{template "header" .}}
-      </header>
-      <main>
-        {{template "main" .}}
-      </main>
+      {{template "header" .}}
+
+      {{template "main" .}}
+      
       {{template "footer" .}}
   </body>
 </html>

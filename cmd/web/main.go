@@ -17,7 +17,7 @@ type application struct {
 	infolog       *log.Logger
 	templateCache map[string]*template.Template
 	models        *mysql.MySQLModels
-	JWTkey        string
+	JWTkey        []byte
 }
 
 func main() {
@@ -46,7 +46,7 @@ func main() {
 		infolog:       infoLog,
 		templateCache: templateCache,
 		models:        mysql.NewMySQLModels(db),
-		JWTkey:        "super secret key", // TODO: убрать временную заглушку
+		JWTkey:        []byte("super secret key"), // TODO: убрать временную заглушку
 	}
 
 	// Инициализация структуры сервера

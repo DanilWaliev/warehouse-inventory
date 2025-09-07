@@ -1,28 +1,28 @@
-{{define "header"}}
-<div class="header-container">
-            <!-- Левая часть - навигационные кнопки -->
-            <nav class="nav-menu">
-                <button class="nav-button active">
-                    <span class="icon">🏭</span>
-                    Производство
-                </button>
-                <button class="nav-button">
-                    <span class="icon">🚚</span>
-                    Перемещения
-                </button>
-                <button class="nav-button">
-                    <span class="icon">⚙️</span>
-                    Администрирование
-                </button>
-            </nav>
+{{/* TODO: загрузка хедера исходя из роли */}}
 
-            <!-- Правая часть - управление аккаунтом -->
-            <div class="account-section">
-                <button class="account-button">
-                    <div class="user-avatar">U</div>
-                    <span>Аккаунт</span>
-                    <span class="icon">▼</span>
+{{define "header"}}
+<!-- Хедер -->
+    <div class="header-container">
+        <!-- Левая часть - навигационные кнопки -->
+        <nav class="nav-menu">
+            <a href="/production">
+                <button class="nav-button">
+                Производство
                 </button>
-            </div>
+            </a>
+            <button class="nav-button">
+                Перемещения
+            </button>
+            <button class="nav-button">
+                Администрирование
+            </button>
+        </nav>
+
+        <!-- Правая часть - управление аккаунтом -->
+        <div class="account-section">
+            <button class="account-button">
+                <span>Аккаунт</span>
+            </button>
         </div>
+    </div>
 {{end}}

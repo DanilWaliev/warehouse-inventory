@@ -7,7 +7,7 @@ import (
 )
 
 // Авторизация пользователя. Возвращает роль в виде строки или перенаправляет на регистрацию
-func (app *application) auth(w http.ResponseWriter, r *http.Request) (string, error) {
+func (app *application) auth(r *http.Request) (string, error) {
 	// Проверяем есть ли куки в HTTP запросе
 	cookie, err := r.Cookie("jwt")
 	if err != nil {

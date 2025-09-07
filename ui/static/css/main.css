@@ -9,6 +9,7 @@
    /* Импорт стилей отдельных страниц */
 @import 'pages/signup.css';
 @import 'pages/signin.css';
+@import 'header.css';
 
 :root {
   /* Цветовая палитра */
@@ -200,4 +201,30 @@ img {
   border-radius: var(--border-radius-lg);
   padding: var(--spacing-5);
   box-shadow: var(--shadow);
+}
+
+/* Двухколоночный layout */
+.layout {
+  display: flex;
+  gap: var(--spacing-6);
+  align-items: flex-start;
+}
+
+.sidebar {
+  width: 220px;
+}
+
+.sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+}
+
+.content {
+  flex: 1;
+}
+
+/* вкладки */
+.hidden {
+  display: none;
 }
