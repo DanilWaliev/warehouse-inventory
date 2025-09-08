@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+/* Файл содержит определения структур для хранения данных из БД в коде */
+
 var ErrNoRecord error = errors.New("models: подходящей записи не найдено")
 
 type User struct {

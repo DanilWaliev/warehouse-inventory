@@ -6,6 +6,8 @@ import (
 	"runtime/debug"
 )
 
+/* Файл содержит вспомогательные методы для обработчиков */
+
 // Записывает в errorLog сообщение об ошибке и отправляет ошибку - Internal server error
 func (app *application) serverError(w http.ResponseWriter, err error) {
 	trace := fmt.Sprintf("%s\n%s", err.Error(), debug.Stack())

@@ -2,6 +2,8 @@ package hash
 
 import "golang.org/x/crypto/bcrypt"
 
+/* Файл содержит обертки для функций хеширования пароля и сравнения хеша с паролем */
+
 // Возвращает хеш пароля
 func HashPassword(password string) (string, error) {
 	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)

@@ -4,6 +4,8 @@ import (
 	"net/http"
 )
 
+/* Файл содержит обработчики запросов к страницам веб-приложения */
+
 func (app *application) root(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		app.notFound(w)

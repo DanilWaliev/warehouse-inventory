@@ -5,6 +5,8 @@ import (
 	"text/template"
 )
 
+/* Файл содержит функцию для загрузки всех страниц в память веб-приложения */
+
 // Создает и возвращает карту кеша для шаблонов страниц
 func newTemplateCache(dir string) (map[string]*template.Template, error) {
 	// Карта, которая хранит кеш
