@@ -2,7 +2,6 @@
 
 /* Сборка всех файлов в одно место */
 
-/* Основное: */
 /* Переменные, reset, типографика, кнопки, формы, утилиты */
 @import 'base.css';
 /* layout страницы (page, sidebar, content, topbar, container) */
@@ -11,7 +10,6 @@
 /* Импорт стилей для отдельных страниц */
 @import 'pages/signup.css';
 @import 'pages/signin.css';
-@import 'pages/production.css';
 
 /* Импорт стилей для отдельных компонентов страницы */
 @import 'components/header.css';
