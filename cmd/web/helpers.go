@@ -6,23 +6,6 @@ import (
 	"runtime/debug"
 )
 
-// Авторизация пользователя. Возвращает роль в виде строки или перенаправляет на регистрацию
-func (app *application) auth(r *http.Request) (string, error) {
-	// Проверяем есть ли куки в HTTP запросе
-	cookie, err := r.Cookie("jwt")
-	if err != nil {
-		return "", err
-	}
-
-	// Верификация токена и переадрессация на вход если произошла ошибка
-	claims, err := app.verifyToken(cookie.Value)
-	if err != nil {
-		return "", err
-	}
-
-	return claims["role"].(string), nil
-}
-
 // Записывает в errorLog сообщение об ошибке и отправляет ошибку - Internal server error
 func (app *application) serverError(w http.ResponseWriter, err error) {
 	trace := fmt.Sprintf("%s\n%s", err.Error(), debug.Stack())
