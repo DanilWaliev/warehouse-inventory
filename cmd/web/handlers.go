@@ -89,8 +89,7 @@ func (app *application) signUp(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 
 	// Проверяем существует ли пользователь
-	// TODO: пофиксить баг регистрации. Когда используется уже существующий email происходит internal server error
-	if exists, err := app.models.UserModel.ExistsByEmail(email); exists && (err != nil) {
+	if exists, err := app.models.UserModel.ExistsByEmail(email); exists {
 		templateData := struct {
 			Message string
 		}{
@@ -98,6 +97,9 @@ func (app *application) signUp(w http.ResponseWriter, r *http.Request) {
 		}
 
 		app.render(w, "signup.page.tmpl", templateData)
+		return
+	} else if err != nil {
+		app.serverError(w, err)
 	}
 
 	err := app.models.UserModel.InsertUser(fullname, phone, email, password, role)
@@ -106,10 +108,30 @@ func (app *application) signUp(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, err)
 	}
 
-	// http.Redirect(w, r, "/signin", http.StatusFound)
+	http.Redirect(w, r, "/signin", http.StatusFound)
 	// TODO: сделать завершение регистрации (окно о том, что администратор рассмотрит заявку)
+}
+
+func (app *application) signOut(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "jwt",
+		Value:    "",
+		Path:     "/",
+		Expires:  time.Now().Add(-time.Hour),
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+		Secure:   true,
+	})
+
+	http.Redirect(w, r, "/", http.StatusFound)
 }
 
 func (app *application) production(w http.ResponseWriter, r *http.Request) {
 	app.render(w, "production.page.tmpl", nil) // TODO: Добавить данные для шаблона
 }
+
+// func (app *application) createTMC(w http.ResponseWriter, r * http.Request) {
+// 	if (r.Method != http.MethodPost {
+// 		// Если не POST, то грузим страницу с имеющемися ТМЦ и кнопкой добавления
+// 	})
+// }

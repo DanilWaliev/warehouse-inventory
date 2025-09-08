@@ -1,4 +1,14 @@
 /* header.css */
+
+.nav-menu a,
+.nav-menu a:link,
+.nav-menu a:visited,
+.nav-menu a:hover,
+.nav-menu a:active {
+    color: white;
+    text-decoration: none;
+}
+
 .header-container {
     justify-content: space-between;
     align-items: center;
@@ -11,6 +21,7 @@
 .nav-menu {
     float: left;
     align-items: center;
+    display: flex;
     height: 100%;
 }
 
@@ -18,26 +29,12 @@
     background: none;
     color: white;
     padding: var(--spacing-3) var(--spacing-4);
-    font-weight: 500;
-    height: 100%;
-    border-radius: 0;
-    position: relative;
+    border-radius: var(--border-radius);
     transition: var(--transition);
 }
 
 .nav-button:hover {
     background-color: rgba(255, 255, 255, 0.05);
-}
-
-.nav-button:not(:last-child)::after {
-    content: '';
-    position: absolute;
-    right: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    height: 20px;
-    width: 1px;
-    background-color: rgba(255, 255, 255, 0.1);
 }
 
 .account-section {

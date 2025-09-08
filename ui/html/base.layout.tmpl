@@ -7,11 +7,17 @@
     <link rel="stylesheet" type="text/css" href="/static/css/main.css">
   </head>
   <body>
+    <div>
       {{template "header" .}}
-
+    </div>
+    <div>
       {{template "main" .}}
-      
+    </div>
+    <div>
       {{template "footer" .}}
+    </div>
+    <script src="/static/js/toast.js"></script>
   </body>
+  <div id="toast-container"></div>
 </html>
 {{ end }}

@@ -1,0 +1,23 @@
+/* table.css */
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  padding: var(--spacing-3);
+  border-bottom: 1px solid rgba(100,116,139,0.12);
+  text-align: left;
+  vertical-align: middle;
+}
+
+/* Кнопки удаления в таблице */
+.btn-delete {
+  background: var(--color-error);
+  color: white;
+  padding: var(--spacing-2) var(--spacing-3);
+  border-radius: var(--border-radius);
+  border: none;
+}

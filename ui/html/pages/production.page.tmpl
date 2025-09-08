@@ -6,210 +6,214 @@
 {{define "title"}}Произодство{{end}}
 
 {{ define "main" }}
-<main class="container layout">
+<main>
 
-  <!-- Левое вертикальное меню -->
-  <aside class="card p-4 sidebar">
-    <nav>
-      <button class="btn btn-primary" onclick="showTab('tmc')">ТМЦ</button>
-      <button class="btn btn-primary" onclick="showTab('recipe')">Рецептуры</button>
-      <button class="btn btn-primary" onclick="showTab('order')">Заказы</button>
-    </nav>
-  </aside>
+  <!-- Обёртка под хедером: слева меню, справа контент -->
+  <div class="page" id="page-root">
 
-  <!-- Правая рабочая зона -->
-  <section class="content">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <ul>
+        <li class="active" data-tab="tmc">ТМЦ</li>
+        <li data-tab="recipe">Рецептуры</li>
+        <li data-tab="order">Заказы</li>
+      </ul>
+    </aside>
 
-    <!-- Вкладка: ТМЦ -->
-    <div id="tab-tmc" class="tab-content">
-      <div class="card mb-4">
-        <h2 class="mb-4">Добавить новый ТМЦ</h2>
-        <form method="post" action="/tmc/create" class="flex flex-col gap-4">
-          <input type="text" name="name" placeholder="Название" required>
-          <input type="number" name="weight" step="0.01" placeholder="Вес (кг)" required>
-          <select name="type" required>
-            <option value="raw">Сырьё</option>
+    <!-- Content -->
+    <section class="content">
+
+      <!-- Верхняя панель: заголовок секции и кнопка Добавить -->
+      <div class="topbar">
+        <h2 id="section-title">ТМЦ</h2>
+        <div>
+          <button class="btn btn-primary" id="addBtn">Добавить</button>
+        </div>
+      </div>
+
+      <!-- Карточка со списком: внутри таблицы.
+           Здесь мы выводим 3 таблицы (по одной на сущность) и показываем только активную -->
+      <div class="card item-list">
+        <div class="table-wrap">
+
+          <!-- ТМЦ -->
+          <table class="table tab-table" id="table-tmc">
+            <thead>
+              <tr>
+                <th>Название</th>
+                <th>Вес (кг)</th>
+                <th>Тип</th>
+                <th>Заметка</th>
+                <th>Действия</th>
+              </tr>
+            </thead>
+            <tbody>
+              {{ range .TMC }}
+              <tr data-id="{{ .ID }}">
+                <td>{{ .Name }}</td>
+                <td>{{ .Weight }}</td>
+                <td>{{ .Type }}</td>
+                <td class="text-muted">{{ .Note }}</td>
+                <td><form method="post" action="/tmc/delete" onsubmit="return confirm('Удалить?')"><input type="hidden" name="id" value="{{ .ID }}"><button type="submit" class="btn-delete">Удалить</button></form></td>
+              </tr>
+              {{ else }}
+              <tr><td colspan="5" class="text-muted">Нет ТМЦ</td></tr>
+              {{ end }}
+            </tbody>
+          </table>
+
+          <!-- Рецептуры -->
+          <table class="table tab-table hidden" id="table-recipe">
+            <thead>
+              <tr>
+                <th>Результат (ТМЦ)</th>
+                <th>Тип</th>
+                <th>Состав</th>
+                <th>Действия</th>
+              </tr>
+            </thead>
+            <tbody>
+              {{ range .Recipes }}
+              <tr data-id="{{ .ID }}">
+                <td>{{ .ResultName }}</td>
+                <td>{{ .Type }}</td>
+                <td class="text-muted">
+                  {{ range .Ingredients }}
+                    {{ .Name }} ({{ .Quantity }})<br>
+                  {{ end }}
+                </td>
+                <td><form method="post" action="/recipe/delete" onsubmit="return confirm('Удалить?')"><input type="hidden" name="id" value="{{ .ID }}"><button type="submit" class="btn-delete">Удалить</button></form></td>
+              </tr>
+              {{ else }}
+              <tr><td colspan="4" class="text-muted">Нет рецептур</td></tr>
+              {{ end }}
+            </tbody>
+          </table>
+
+          <!-- Заказы -->
+          <table class="table tab-table hidden" id="table-order">
+            <thead>
+              <tr>
+                <th>Рецептура</th>
+                <th>Количество</th>
+                <th>Статус</th>
+                <th>Действия</th>
+              </tr>
+            </thead>
+            <tbody>
+              {{ range .Orders }}
+              <tr data-id="{{ .ID }}">
+                <td>{{ .RecipeName }}</td>
+                <td>{{ .Quantity }}</td>
+                <td>{{ .Status }}</td>
+                <td>
+                  {{ if eq .Status "open" }}
+                    <form method="post" action="/order/close" style="display:inline;"><input type="hidden" name="id" value="{{ .ID }}"><button type="submit" class="btn-delete">Закрыть</button></form>
+                    <form method="post" action="/order/delete" style="display:inline;"><input type="hidden" name="id" value="{{ .ID }}"><button type="submit" class="btn-delete">Удалить</button></form>
+                  {{ else }}
+                    <form method="post" action="/order/delete"><input type="hidden" name="id" value="{{ .ID }}"><button type="submit" class="btn-delete">Удалить</button></form>
+                  {{ end }}
+                </td>
+              </tr>
+              {{ else }}
+              <tr><td colspan="4" class="text-muted">Нет заказов</td></tr>
+              {{ end }}
+            </tbody>
+          </table>
+
+        </div>
+      </div>
+
+    </section>
+  </div>
+
+  <!-- Модальное окно: содержит 3 формы, и показывается форма соответствующей вкладке -->
+  <div id="modal" class="modal hidden" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="modal-content" role="document">
+      <!-- Общий заголовок модалки -->
+      <h3 id="modal-title" class="mb-4">Добавить</h3>
+
+      <!-- Форма: ТМЦ -->
+      <form id="form-tmc" class="modal-form" method="post" action="/tmc/create">
+        <div class="mb-4">
+          <input name="name" type="text" required class="w-full" placeholder="Название">
+        </div>
+        <div class="mb-4">
+          <input name="weight" type="number" step="0.01" required class="w-full" placeholder="Вес (кг)">
+        </div>
+        <div class="mb-4">
+          <select name="type" class="w-full">
+            <option value="raw">Сырье</option>
             <option value="semi">Полуфабрикат</option>
             <option value="product">Продукт</option>
           </select>
-          <textarea name="note" placeholder="Заметка"></textarea>
-          <button type="submit" class="btn btn-primary mt-2">Добавить</button>
-        </form>
-      </div>
+        </div>
+        <div class="mb-4">
+          <p><label>Заметка</label></p>
+          <textarea name="note" class="w-full"></textarea>
+        </div>
+        <div class="flex justify-end gap-2">
+          <button type="button" class="btn" id="modal-cancel">Отмена</button>
+          <button type="submit" class="btn btn-primary">Сохранить</button>
+        </div>
+      </form>
 
-      <div class="card">
-        <h3 class="mb-4">Список ТМЦ</h3>
-        <table class="w-full">
-          <thead>
-            <tr>
-              <th class="text-left p-2">Название</th>
-              <th class="text-left p-2">Вес (кг)</th>
-              <th class="text-left p-2">Тип</th>
-              <th class="text-left p-2">Заметка</th>
-            </tr>
-          </thead>
-          <tbody>
+      <!-- Форма: Рецептура -->
+      <form id="form-recipe" class="modal-form hidden" method="post" action="/recipe/create">
+        <div class="mb-4">
+          <label>Результирующий ТМЦ</label>
+          <select name="tmc_id" class="w-full">
             {{ range .TMC }}
-            <tr>
-              <td class="p-2">{{ .Name }}</td>
-              <td class="p-2">{{ .Weight }}</td>
-              <td class="p-2">{{ .Type }}</td>
-              <td class="p-2">{{ .Note }}</td>
-            </tr>
+              <option value="{{ .ID }}">{{ .Name }}</option>
             {{ end }}
-          </tbody>
-        </table>
-      </div>
-    </div>
+          </select>
+        </div>
+        <div class="mb-4">
+          <label>Тип (полуфаб/продукт)</label>
+          <select name="type" class="w-full">
+            <option value="semi">Полуфабрикат</option>
+            <option value="product">Продукт</option>
+          </select>
+        </div>
 
-    <!-- Вкладка: Рецептуры -->
-    <div id="tab-recipe" class="tab-content hidden">
-      <div class="card mb-4">
-        <h2 class="mb-4">Создать рецептуру</h2>
-        <form method="post" action="/recipe/create" class="flex flex-col gap-4">
-          <div>
-            <label class="text-bold">ТМЦ (результат)</label>
-            <select name="tmc_id" required>
-              {{ range .TMC }}
-                <option value="{{ .ID }}">{{ .Name }}</option>
-              {{ end }}
+        <div id="recipe-ingredients">
+          <div class="mb-2 flex gap-2">
+            <select name="ingredients[0].tmc_id" class="w-2/3">
+              {{ range .TMC }}<option value="{{ .ID }}">{{ .Name }}</option>{{ end }}
             </select>
+            <input name="ingredients[0].quantity" type="number" step="0.01" placeholder="Кол-во" class="w-1/3">
           </div>
+        </div>
 
-          <div>
-            <label class="text-bold">Тип</label>
-            <select name="type" required>
-              <option value="semi">Полуфабрикат</option>
-              <option value="product">Продукт</option>
-            </select>
-          </div>
+        <div class="mb-4">
+          <button type="button" class="btn" id="add-ingredient">+ добавить компонент</button>
+        </div>
 
-          <div id="ingredients-list" class="mb-4">
-            <div class="flex gap-2 mb-2">
-              <select name="ingredients[0].tmc_id" required>
-                {{ range .TMC }}
-                  <option value="{{ .ID }}">{{ .Name }}</option>
-                {{ end }}
-              </select>
-              <input type="number" name="ingredients[0].quantity" placeholder="Количество" required>
-            </div>
-          </div>
+        <div class="flex justify-end gap-2">
+          <button type="button" class="btn" id="modal-cancel-2">Отмена</button>
+          <button type="submit" class="btn btn-primary">Сохранить</button>
+        </div>
+      </form>
 
-          <button type="button" class="btn bg-primary text-white" onclick="addIngredient()">+ Добавить ТМЦ</button>
-          <button type="submit" class="btn btn-primary mt-2">Сохранить рецептуру</button>
-        </form>
-      </div>
+      <!-- Форма: Заказ -->
+      <form id="form-order" class="modal-form hidden" method="post" action="/order/create">
+        <div class="mb-4">
+          <label>Рецептура</label>
+          <select name="recipe_id" class="w-full">
+            {{ range .Recipes }}<option value="{{ .ID }}">{{ .ResultName }}</option>{{ end }}
+          </select>
+        </div>
+        <div class="mb-4">
+          <label>Количество</label>
+          <input name="quantity" type="number" step="1" required class="w-full">
+        </div>
+        <div class="flex justify-end gap-2">
+          <button type="button" class="btn" id="modal-cancel-3">Отмена</button>
+          <button type="submit" class="btn btn-primary">Создать</button>
+        </div>
+      </form>
 
-      <div class="card">
-        <h3 class="mb-4">Список рецептур</h3>
-        <table class="w-full">
-          <thead>
-            <tr>
-              <th class="text-left p-2">ID</th>
-              <th class="text-left p-2">ТМЦ</th>
-              <th class="text-left p-2">Тип</th>
-              <th class="text-left p-2">Состав</th>
-            </tr>
-          </thead>
-          <tbody>
-            {{ range .Recipes }}
-            <tr>
-              <td class="p-2">{{ .ID }}</td>
-              <td class="p-2">{{ .ResultName }}</td>
-              <td class="p-2">{{ .Type }}</td>
-              <td class="p-2">
-                {{ range .Ingredients }}
-                  {{ .Name }} ({{ .Quantity }})<br>
-                {{ end }}
-              </td>
-            </tr>
-            {{ end }}
-          </tbody>
-        </table>
-      </div>
     </div>
-
-    <!-- Вкладка: Заказы -->
-    <div id="tab-order" class="tab-content hidden">
-      <div class="card mb-4">
-        <h2 class="mb-4">Создать производственный заказ</h2>
-        <form method="post" action="/order/create" class="flex flex-col gap-4">
-          <div>
-            <label class="text-bold">Рецептура</label>
-            <select name="recipe_id" required>
-              {{ range .Recipes }}
-                <option value="{{ .ID }}">{{ .ResultName }}</option>
-              {{ end }}
-            </select>
-          </div>
-          <div>
-            <label class="text-bold">Количество</label>
-            <input type="number" name="quantity" required>
-          </div>
-          <button type="submit" class="btn btn-primary mt-2">Создать</button>
-        </form>
-      </div>
-
-      <div class="card">
-        <h3 class="mb-4">Список заказов</h3>
-        <table class="w-full">
-          <thead>
-            <tr>
-              <th class="text-left p-2">ID</th>
-              <th class="text-left p-2">Рецептура</th>
-              <th class="text-left p-2">Количество</th>
-              <th class="text-left p-2">Статус</th>
-              <th class="text-left p-2">Действия</th>
-            </tr>
-          </thead>
-          <tbody>
-            {{ range .Orders }}
-            <tr>
-              <td class="p-2">{{ .ID }}</td>
-              <td class="p-2">{{ .RecipeName }}</td>
-              <td class="p-2">{{ .Quantity }}</td>
-              <td class="p-2">{{ .Status }}</td>
-              <td class="p-2">
-                {{ if eq .Status "open" }}
-                  <form method="post" action="/order/close" style="display:inline;">
-                    <input type="hidden" name="id" value="{{ .ID }}">
-                    <button type="submit" class="btn btn-primary btn-sm">Закрыть</button>
-                  </form>
-                {{ else }}
-                  <span class="text-muted">Закрыт</span>
-                {{ end }}
-              </td>
-            </tr>
-            {{ end }}
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-  </section>
-</main>
-
-<script>
-let ingredientIndex = 1;
-function addIngredient() {
-  const container = document.getElementById('ingredients-list');
-  const div = document.createElement('div');
-  div.className = 'flex gap-2 mb-2';
-  div.innerHTML = `
-    <select name="ingredients[${ingredientIndex}].tmc_id" required>
-      {{ range .TMC }}
-        <option value="{{ .ID }}">{{ .Name }}</option>
-      {{ end }}
-    </select>
-    <input type="number" name="ingredients[${ingredientIndex}].quantity" placeholder="Количество" required>
-  `;
-  container.appendChild(div);
-  ingredientIndex++;
-}
-
-function showTab(tab) {
-  document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-  document.getElementById('tab-' + tab).classList.remove('hidden');
-}
-</script>
+  </div>
+<script src="/static/js/production.js"></script>
 {{ end }}
