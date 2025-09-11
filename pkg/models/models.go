@@ -9,6 +9,14 @@ import (
 
 var ErrNoRecord error = errors.New("models: подходящей записи не найдено")
 
+type Component struct {
+	ID     int
+	Name   string
+	Weight float64
+	Type   string
+	Note   string
+}
+
 type User struct {
 	ID           int
 	Username     string

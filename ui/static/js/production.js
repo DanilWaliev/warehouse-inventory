@@ -26,8 +26,141 @@
     sectionTitle.textContent = tab === 'tmc' ? 'ТМЦ' : tab === 'recipe' ? 'Рецептуры' : 'Заказы';
     // Показать нужную таблицу
     Object.keys(tables).forEach(k => tables[k].classList.toggle('hidden', k !== tab));
+
+    // Загрузить данные в таблицу
+    switch (tab) {
+      case "tmc":
+        loadAllTMC();
+        break;
+      case "recipe":
+        //loadAllRecipe();
+        break;
+      case "order":
+        //loadAllOrder();
+        break;
+    }
   }
 
+  // Загрузка всех ТМЦ в таблицу
+  async function loadAllTMC() {
+    const res = await fetch("/api/tmc"); 
+    const data = await res.json();
+    const tbody = document.getElementById("table-tmc-body");
+    tbody.innerHTML = "";
+
+    if (!data || data.length === 0) {
+      const tr = document.createElement("tr");
+      tr.innerHTML=`<tr><td colspan="5" class="text-muted">Нет ТМЦ</td></tr>`;
+      tbody.appendChild(tr);
+    } else {
+      data.forEach(item => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+      <td>${item.Name}</td>
+      <td>${item.Weight}</td>
+      <td>${item.Type}</td>
+      <td>${item.Note}</td>
+      <td>
+        <button class="btn-delete">Удалить</button>
+      </td>
+      `;
+
+      tr.querySelector(".btn-delete").addEventListener("click", () => deleteTMC(item.ID));
+
+      tbody.appendChild(tr)
+    });
+    }
+  }
+
+  // Отправление запроса на создание ТМЦ
+  async function createTMC(e) {
+    // Отмена перезагрузки
+    e.preventDefault(); 
+
+    const form = e.target;
+    const formData = new FormData(form);
+
+    // Получаем данные с формы
+    const name = formData.get("name");
+    const weight = formData.get("weight");
+    const type = formData.get("type");
+    const note = formData.get("note");
+
+    // Валидация данных
+    if (name.length > 255 ||
+      note.length > 45 ||
+      weight <= 0
+    ) {
+      showToast("Некорректные данные");
+      return;
+    }
+
+    // Отправляем данные в JSON для создания ТМЦ
+    const res = await fetch("/api/tmc/create", {
+      method: "POST",
+      body: JSON.stringify({
+        name: name,
+        weight: weight,
+        type: type,
+        note: note,
+      }),
+      headers: {
+        "Content-Type": "application/json"
+      }
+    });
+
+    if (res.ok) {
+      form.reset(); // Очистка формы
+      closeModal() // Закрываем модалку
+      loadAllTMC(); // Подгружаем обновленный список ТМЦ
+      showToast("ТМЦ создан успешно", "success");
+      return;
+    } else {
+      switch (res.status) {
+        case 401:
+          showToast("Нет доступа");
+          return;
+        case 400:
+          showToast("Некорректные данные");
+          return;
+        case 409:
+          showToast("Такой ТМЦ уже существует");
+          return;
+        case 500:
+          showToast("Ошибка на стороне сервера");
+          return;
+        default:
+          showToast("Ошибка при создании ТМЦ");
+          return;
+      }
+    }
+  }
+
+  // Удаление ТМЦ и загрузка обновленного списка ТМЦ
+  async function deleteTMC(id) {
+    const res = await fetch(`/api/tmc/delete`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({id: id})
+    });
+
+    if (res.ok) {
+      loadAllTMC();
+      return
+    } else {
+      switch (res.status) {
+        case 401:
+          showToast("Нет доступа");
+          return;
+        case 500:
+          showToast("Ошибка на стороне сервера");
+          return;
+        default:
+          showToast("Ошибка при удалении ТМЦ");
+          return;
+      }
+    }
+  }
   // Навешивание кликов на меню
   tabs.forEach(li => li.addEventListener('click', e => {
     setActive(li.dataset.tab);
@@ -41,9 +174,11 @@
 
     // скрываем все формы, показываем только нужную
     Object.keys(forms).forEach(k => forms[k].classList.toggle('hidden', k !== active));
-    // блокируем скролл страницы (необязательно)
+    // блокируем скролл страницы
     document.body.style.overflow = 'hidden';
   }
+
+  forms.tmc.addEventListener("submit", createTMC);
 
   function closeModal() {
     modal.classList.add('hidden');
@@ -68,7 +203,7 @@
     ingIndex++;
   });
 
-  // --- Подстройка отступа для sidebar, чтобы он не перекрывал хедер
+  // Подстройка отступа для sidebar, чтобы он не перекрывал хедер
   function updateHeaderOffset() {
     const headerEl = document.querySelector('header') || document.querySelector('div.header') || null;
     const h = headerEl ? headerEl.getBoundingClientRect().height : 0;

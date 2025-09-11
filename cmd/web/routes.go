@@ -12,9 +12,10 @@ func (app *application) routes() *http.ServeMux {
 	mux.HandleFunc("/production", app.production)
 
 	// Запросы к API
-	mux.HandleFunc("/api/tmc/create", app.createTMC)
-	mux.HandleFunc("/api/tmc/delete", app.deleteTMC)
-	mux.HandleFunc("/api/tmc/edit", app.editTMC)
+	mux.HandleFunc("/api/tmc", app.ShowAllTMC)
+	mux.HandleFunc("/api/tmc/create", app.CreateTMC)
+	mux.HandleFunc("/api/tmc/delete", app.DeleteTMC)
+	mux.HandleFunc("/api/tmc/edit", app.EditTMC)
 
 	fileServer := http.FileServer(http.Dir("./ui/static"))
 	mux.Handle("/static/", http.StripPrefix("/static", fileServer))

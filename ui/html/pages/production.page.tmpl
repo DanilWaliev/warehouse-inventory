@@ -47,18 +47,8 @@
                 <th>Действия</th>
               </tr>
             </thead>
-            <tbody>
-              {{ range .TMC }}
-              <tr data-id="{{ .ID }}">
-                <td>{{ .Name }}</td>
-                <td>{{ .Weight }}</td>
-                <td>{{ .Type }}</td>
-                <td class="text-muted">{{ .Note }}</td>
-                <td><form method="post" action="/tmc/delete" onsubmit="return confirm('Удалить?')"><input type="hidden" name="id" value="{{ .ID }}"><button type="submit" class="btn-delete">Удалить</button></form></td>
-              </tr>
-              {{ else }}
-              <tr><td colspan="5" class="text-muted">Нет ТМЦ</td></tr>
-              {{ end }}
+            <tbody id="table-tmc-body">
+              
             </tbody>
           </table>
 
@@ -134,7 +124,7 @@
       <h3 id="modal-title" class="mb-4">Добавить</h3>
 
       <!-- Форма: ТМЦ -->
-      <form id="form-tmc" class="modal-form" method="post" action="/tmc/create">
+      <form id="form-tmc" class="modal-form">
         <div class="mb-4">
           <input name="name" type="text" required class="w-full" placeholder="Название">
         </div>
@@ -159,7 +149,7 @@
       </form>
 
       <!-- Форма: Рецептура -->
-      <form id="form-recipe" class="modal-form hidden" method="post" action="/recipe/create">
+      <form id="form-recipe" class="modal-form hidden">
         <div class="mb-4">
           <label>Результирующий ТМЦ</label>
           <select name="tmc_id" class="w-full">
@@ -196,7 +186,7 @@
       </form>
 
       <!-- Форма: Заказ -->
-      <form id="form-order" class="modal-form hidden" method="post" action="/order/create">
+      <form id="form-order" class="modal-form hidden">
         <div class="mb-4">
           <label>Рецептура</label>
           <select name="recipe_id" class="w-full">

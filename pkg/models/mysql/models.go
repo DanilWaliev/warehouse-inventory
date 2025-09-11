@@ -6,12 +6,14 @@ import "database/sql"
 
 // Собирает все модели в одну структуру для удобства использования
 type MySQLModels struct {
-	UserModel UserModel
+	UserModel      UserModel
+	ComponentModel ComponentModel
 }
 
 // Конструктор
 func NewMySQLModels(db *sql.DB) *MySQLModels {
 	return &MySQLModels{
-		UserModel: UserModel{DB: db},
+		UserModel:      UserModel{DB: db},
+		ComponentModel: ComponentModel{DB: db},
 	}
 }
