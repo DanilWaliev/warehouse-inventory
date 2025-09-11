@@ -26,3 +26,7 @@
 .modal-title {
   margin: var(mb-4)
 }
+
+.modal button {
+  margin-right: var(--spacing-4);
+}
