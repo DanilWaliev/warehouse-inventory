@@ -93,3 +93,19 @@ func (m *ComponentModel) DeleteByID(id int) error {
 
 	return nil
 }
+
+func (m *ComponentModel) Update(id int, name string, weight float64, componentType string, note string) error {
+	stmt := `UPDATE component
+	SET Name = ?,
+		Weight = ?,
+		Type = ?,
+		Note = ?
+	WHERE Component_ID = ?`
+
+	_, err := m.DB.Exec(stmt, name, weight, componentType, note, id)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

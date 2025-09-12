@@ -41,6 +41,10 @@
     }
   }
 
+  // ------------------------+
+  // Скрипты для раздела ТМЦ |
+  // ------------------------+
+
   // Загрузка всех ТМЦ в таблицу
   async function loadAllTMC() {
     const res = await fetch("/api/tmc"); 
@@ -54,6 +58,19 @@
       tbody.appendChild(tr);
     } else {
       data.forEach(item => {
+        // Переводим тип ТМЦ на русский:
+        switch (item.Type) {
+          case "raw":
+            item.Type = "Сырье";
+            break;
+          case "semi":
+            item.Type = "Полуфабрикат";
+            break;
+          case "product":
+            item.Type = "Продукт";
+            break;
+        }
+
       const tr = document.createElement("tr");
       tr.innerHTML = `
       <td>${item.Name}</td>
@@ -62,10 +79,12 @@
       <td>${item.Note}</td>
       <td>
         <button class="btn-delete">Удалить</button>
+        <button class="btn-edit">Изменить</button>
       </td>
       `;
 
       tr.querySelector(".btn-delete").addEventListener("click", () => deleteTMC(item.ID));
+      tr.querySelector(".btn-edit").addEventListener("click", () => editTMC(item.ID));
 
       tbody.appendChild(tr)
     });
@@ -110,10 +129,10 @@
     });
 
     if (res.ok) {
-      form.reset(); // Очистка формы
+      form.reset();
       closeModal() // Закрываем модалку
       loadAllTMC(); // Подгружаем обновленный список ТМЦ
-      showToast("ТМЦ создан успешно", "success");
+      showToast("ТМЦ успешно  создан", "success");
       return;
     } else {
       switch (res.status) {
@@ -138,6 +157,8 @@
 
   // Удаление ТМЦ и загрузка обновленного списка ТМЦ
   async function deleteTMC(id) {
+    if (!(await showConfirm("Вы действительно хотите удалить ТМЦ?", "Удалить ТМЦ"))) return;
+
     const res = await fetch(`/api/tmc/delete`, {
       method: "POST",
       headers: {"Content-Type": "application/json"},
@@ -146,6 +167,7 @@
 
     if (res.ok) {
       loadAllTMC();
+      showToast("ТМЦ удалён", "success")
       return
     } else {
       switch (res.status) {
@@ -161,6 +183,90 @@
       }
     }
   }
+
+// Редактирование ТМЦ
+async function editTMC(id) {
+  // Загрузить данные по ТМЦ
+  const res = await fetch(`/api/tmc/get`, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ id: id })
+  });
+
+  if (!res.ok) {
+    showToast("Ошибка загрузки ТМЦ");
+    return;
+  }
+  const item = await res.json();
+
+  // Открыть модалку и показать форму ТМЦ
+  modal.classList.remove('hidden');
+  modal.setAttribute('aria-hidden','false');
+  modalTitle.textContent = "Изменить ТМЦ";
+  Object.keys(forms).forEach(k => forms[k].classList.toggle('hidden', k !== 'tmc'));
+  document.body.style.overflow = 'hidden';
+
+  // Заполнить поля
+  const form = forms.tmc;
+  form.elements["name"].value = item.Name;
+  form.elements["weight"].value = item.Weight;
+  form.elements["type"].value = item.Type;
+  form.elements["note"].value = item.Note || "";
+
+  // Временный обработчик для обновления
+  form.onsubmit = async function (e) {
+    e.preventDefault();
+
+    const fd = new FormData(form);
+    const name = fd.get("name");
+    const weight = fd.get("weight");
+    const type = fd.get("type");
+    const note = fd.get("note");
+
+    const updRes = await fetch("/api/tmc/edit", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ id, name, weight, type, note }),
+    });
+
+    if (updRes.ok) {
+      form.reset();
+      closeModal();
+      loadAllTMC();
+      showToast("ТМЦ обновлён", "success");
+    } else {
+      switch (updRes.status) { // <- используй updRes тут, а не res
+        case 401:
+          showToast("Нет доступа");
+          break;
+        case 400:
+          showToast("Некорректные данные");
+          break;
+        case 409:
+          showToast("Такой ТМЦ уже существует");
+          break;
+        case 500:
+          showToast("Ошибка на стороне сервера");
+          break;
+        default:
+          showToast("Ошибка при обновлении ТМЦ");
+      }
+    }
+
+    // вернуть обработчик создания как было раньше
+    form.onsubmit = createTMC;
+  };
+}
+
+
+  
+  // ------------------------------+
+  // Скрипты для раздела Рецептуры |
+  // ------------------------------+
+
+  // Скрипты для раздела Заказы
+
+  
   // Навешивание кликов на меню
   tabs.forEach(li => li.addEventListener('click', e => {
     setActive(li.dataset.tab);
@@ -178,13 +284,22 @@
     document.body.style.overflow = 'hidden';
   }
 
-  forms.tmc.addEventListener("submit", createTMC);
+  forms.tmc.onsubmit = createTMC;
 
   function closeModal() {
-    modal.classList.add('hidden');
-    modal.setAttribute('aria-hidden','true');
-    document.body.style.overflow = '';
-  }
+  modal.classList.add('hidden');
+  modal.setAttribute('aria-hidden','true');
+  document.body.style.overflow = '';
+
+  // Сброс форм (без клонирования)
+  try { forms.tmc.reset(); } catch (e) {}
+  try { forms.recipe.reset(); } catch (e) {}
+  try { forms.order.reset(); } catch (e) {}
+
+  // Гарантированно восстановить стандартный обработчик сабмита
+  forms.tmc.onsubmit = createTMC;
+}
+
 
   addBtn.addEventListener('click', openModal);
   document.getElementById('modal-cancel').addEventListener('click', closeModal);

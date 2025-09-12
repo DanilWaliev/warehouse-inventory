@@ -21,3 +21,12 @@
   border-radius: var(--border-radius);
   border: none;
 }
+
+/* Кнопки изменения в таблице */
+.btn-edit {
+  background: var(--color-primary);
+  color: white;
+  padding: var(--spacing-2) var(--spacing-3);
+  border-radius: var(--border-radius);
+  border: none;
+}
