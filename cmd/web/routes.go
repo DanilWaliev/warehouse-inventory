@@ -12,8 +12,8 @@ func (app *application) routes() *http.ServeMux {
 	mux.HandleFunc("/production", app.production)
 
 	// Запросы к API
-	mux.HandleFunc("/api/tmc", app.ShowAllTMC)
-	mux.HandleFunc("/api/tmc/get", app.ShowTMC)
+	mux.HandleFunc("/api/tmc", app.GetTMCByType)
+	mux.HandleFunc("/api/tmc/get", app.GetTMCByID)
 	mux.HandleFunc("/api/tmc/create", app.CreateTMC)
 	mux.HandleFunc("/api/tmc/delete", app.DeleteTMC)
 	mux.HandleFunc("/api/tmc/edit", app.EditTMC)

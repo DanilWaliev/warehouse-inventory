@@ -22,5 +22,5 @@ func (app *application) root(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *application) production(w http.ResponseWriter, r *http.Request) {
-	app.render(w, "production.page.tmpl", nil) // TODO: Добавить данные для шаблона
+	app.render(w, "production.page.tmpl", nil)
 }
