@@ -10,6 +10,41 @@ type ComponentModel struct {
 	DB *sql.DB
 }
 
+func (m *ComponentModel) GetByType(componentType string) ([]*models.Component, error) {
+	stmt := `SELECT * From component where Type = ?`
+
+	rows, err := m.DB.Query(stmt, componentType)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	var components []*models.Component
+
+	for rows.Next() {
+		c := &models.Component{}
+
+		err := rows.Scan(&c.ID, &c.Name, &c.Weight, &c.Type, &c.Note)
+
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, models.ErrNoRecord
+			} else {
+				return nil, err
+			}
+		}
+
+		components = append(components, c)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return components, nil
+}
+
 // Возвращает компонент с определенным ID
 func (m *ComponentModel) GetByID(id int) (*models.Component, error) {
 	stmt := `SELECT * FROM component

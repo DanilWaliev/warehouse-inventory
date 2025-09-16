@@ -56,27 +56,13 @@
           <table class="table tab-table hidden" id="table-recipe">
             <thead>
               <tr>
-                <th>Результат (ТМЦ)</th>
+                <th>Результат</th>
                 <th>Тип</th>
                 <th>Состав</th>
-                <th>Действия</th>
               </tr>
             </thead>
-            <tbody>
-              {{ range .Recipes }}
-              <tr data-id="{{ .ID }}">
-                <td>{{ .ResultName }}</td>
-                <td>{{ .Type }}</td>
-                <td class="text-muted">
-                  {{ range .Ingredients }}
-                    {{ .Name }} ({{ .Quantity }})<br>
-                  {{ end }}
-                </td>
-                <td><form method="post" action="/recipe/delete" onsubmit="return confirm('Удалить?')"><input type="hidden" name="id" value="{{ .ID }}"><button type="submit" class="btn-delete">Удалить</button></form></td>
-              </tr>
-              {{ else }}
-              <tr><td colspan="4" class="text-muted">Нет рецептур</td></tr>
-              {{ end }}
+            <tbody id="table-recipe-body">
+              
             </tbody>
           </table>
 
@@ -128,9 +114,11 @@
         <div class="mb-4">
           <input name="name" type="text" required class="w-full" placeholder="Название">
         </div>
+
         <div class="mb-4">
           <input name="weight" type="number" step="0.01" required class="w-full" placeholder="Вес (кг)">
         </div>
+
         <div class="mb-4">
           <select name="type" class="w-full">
             <option value="raw">Сырье</option>
@@ -138,10 +126,12 @@
             <option value="product">Продукт</option>
           </select>
         </div>
+
         <div class="mb-4">
           <p><label>Заметка</label></p>
           <textarea name="note" class="w-full"></textarea>
         </div>
+
         <div class="flex justify-end gap-2">
           <button type="button" class="btn" id="modal-cancel">Отмена</button>
           <button type="submit" class="btn btn-primary">Сохранить</button>
@@ -149,40 +139,22 @@
       </form>
 
       <!-- Форма: Рецептура -->
-      <form id="form-recipe" class="modal-form hidden">
+      <form id="form-recipe" class="modal-form">
         <div class="mb-4">
-          <label>Результирующий ТМЦ</label>
-          <select name="tmc_id" class="w-full">
-            {{ range .TMC }}
-              <option value="{{ .ID }}">{{ .Name }}</option>
-            {{ end }}
-          </select>
-        </div>
-        <div class="mb-4">
-          <label>Тип (полуфаб/продукт)</label>
-          <select name="type" class="w-full">
-            <option value="semi">Полуфабрикат</option>
-            <option value="product">Продукт</option>
-          </select>
+          <label>Результат</label>
+          <select name="result-tmc-id" id="result-tmc" class="w-full"></select>
         </div>
 
-        <div id="recipe-ingredients">
-          <div class="mb-2 flex gap-2">
-            <select name="ingredients[0].tmc_id" class="w-2/3">
-              {{ range .TMC }}<option value="{{ .ID }}">{{ .Name }}</option>{{ end }}
-            </select>
-            <input name="ingredients[0].quantity" type="number" step="0.01" placeholder="Кол-во" class="w-1/3">
+        <div class="mb-4">
+          <p><label>Ингредиенты</label></p>
+          <div id="ingredients-list"></div>
+          <button type="button" class="btn btn-secondary mt-2" id="add-ingredient">+ Добавить</button>
+        </div>
+
+          <div class="flex justify-end gap-2">
+            <button type="button" class="btn" id="modal-cancel-2">Отмена</button>
+            <button type="submit" class="btn btn-primary">Сохранить</button>
           </div>
-        </div>
-
-        <div class="mb-4">
-          <button type="button" class="btn" id="add-ingredient">+ добавить компонент</button>
-        </div>
-
-        <div class="flex justify-end gap-2">
-          <button type="button" class="btn" id="modal-cancel-2">Отмена</button>
-          <button type="submit" class="btn btn-primary">Сохранить</button>
-        </div>
       </form>
 
       <!-- Форма: Заказ -->

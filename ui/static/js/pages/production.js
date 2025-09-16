@@ -30,7 +30,7 @@
     // Загрузить данные в таблицу
     switch (tab) {
       case "tmc":
-        loadAllTMC();
+        loadTMCtable();
         break;
       case "recipe":
         //loadAllRecipe();
@@ -41,14 +41,19 @@
     }
   }
 
+  // Получение ТМЦ исходя из типа
+  async function loadTMCbyType(type) {
+    const res = await fetch("/api/tmc?type=" + type);
+    
+    return res.json();
+  }
+
   // ------------------------+
   // Скрипты для раздела ТМЦ |
   // ------------------------+
 
-  // Загрузка всех ТМЦ в таблицу
-  async function loadAllTMC() {
-    const res = await fetch("/api/tmc"); 
-    const data = await res.json();
+  async function loadTMCtable() {
+    let data = await loadTMCbyType("all")
     const tbody = document.getElementById("table-tmc-body");
     tbody.innerHTML = "";
 
@@ -131,7 +136,7 @@
     if (res.ok) {
       form.reset();
       closeModal() // Закрываем модалку
-      loadAllTMC(); // Подгружаем обновленный список ТМЦ
+      loadTMCtable(); // Подгружаем обновленный список ТМЦ
       showToast("ТМЦ успешно  создан", "success");
       return;
     } else {
@@ -166,7 +171,7 @@
     });
 
     if (res.ok) {
-      loadAllTMC();
+      loadTMCtable();
       showToast("ТМЦ удалён", "success")
       return
     } else {
@@ -232,7 +237,7 @@ async function editTMC(id) {
     if (updRes.ok) {
       form.reset();
       closeModal();
-      loadAllTMC();
+      loadTMCtable();
       showToast("ТМЦ обновлён", "success");
     } else {
       switch (updRes.status) { // <- используй updRes тут, а не res
@@ -257,15 +262,20 @@ async function editTMC(id) {
     form.onsubmit = createTMC;
   };
 }
-
-
   
   // ------------------------------+
   // Скрипты для раздела Рецептуры |
   // ------------------------------+
 
-  // Скрипты для раздела Заказы
+  async function loadProductAndSemiTMC() {
+    const res = await fetch("/api/tmc?type=product, semi")
 
+    
+  }
+
+  // ---------------------------+
+  // Скрипты для раздела Заказы |
+  // ---------------------------+
   
   // Навешивание кликов на меню
   tabs.forEach(li => li.addEventListener('click', e => {

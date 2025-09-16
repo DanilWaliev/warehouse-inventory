@@ -5,15 +5,25 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"warehouse-inventory/pkg/models"
 	"warehouse-inventory/pkg/sqlerr"
 )
 
 /* Файл содержит обработчики для запросов к API (получение, удаление, изменение данных) из отображаемой страницы */
 
-func (app *application) ShowAllTMC(w http.ResponseWriter, r *http.Request) {
+func (app *application) GetTMCByType(w http.ResponseWriter, r *http.Request) {
 
 	// Получаем список всех компонентов (ТМЦ) из БД
-	components, err := app.models.ComponentModel.GetAll()
+	componentType := r.URL.Query().Get("type")
+
+	var components []*models.Component
+	var err error
+	if componentType == "all" {
+		components, err = app.models.ComponentModel.GetAll()
+	} else {
+		components, err = app.models.ComponentModel.GetByType(componentType)
+	}
+
 	if err != nil {
 		app.serverError(w, err)
 	}
@@ -26,7 +36,7 @@ func (app *application) ShowAllTMC(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (app *application) ShowTMC(w http.ResponseWriter, r *http.Request) {
+func (app *application) GetTMCByID(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", http.MethodPost)
 		app.clientError(w, http.StatusMethodNotAllowed)
