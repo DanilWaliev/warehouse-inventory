@@ -42,7 +42,7 @@ func (r *Renderer) Render(w http.ResponseWriter, name string, templateData any) 
 	// Получаем шаблон
 	ts, ok := r.cache[name]
 	if !ok {
-		return fmt.Errorf("шаблона %s не существует")
+		return fmt.Errorf("шаблона %s не существует", name)
 	}
 
 	// Рендер
