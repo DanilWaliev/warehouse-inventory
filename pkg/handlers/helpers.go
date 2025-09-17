@@ -8,10 +8,10 @@ import (
 	"text/template"
 )
 
-/* В файле вспомогательные функции для обработчиков */
+/* В файле вспомогательные структуры и методф для обработчиков */
 
-// Структура для получения логгера ошибок и использовании его в обработчике
-type AppLogger struct {
+// Структура для получения логгера ошибок и использовании его в вспомогательных для обработчиков методах
+type LogHelper struct {
 	errorLog *log.Logger
 }
 
@@ -21,7 +21,7 @@ type Renderer struct {
 }
 
 // Отправляет Internal Server Error и логирует ошибку
-func (l *AppLogger) ServerError(w http.ResponseWriter, err error) {
+func (l *LogHelper) ServerError(w http.ResponseWriter, err error) {
 	trace := fmt.Sprintf("%s\n%s", err.Error(), debug.Stack())
 	l.errorLog.Output(2, trace)
 
@@ -29,12 +29,12 @@ func (l *AppLogger) ServerError(w http.ResponseWriter, err error) {
 }
 
 // Отправляет ошибку с указанным статусом
-func (l *AppLogger) ClientError(w http.ResponseWriter, status int) {
+func (l *LogHelper) ClientError(w http.ResponseWriter, status int) {
 	http.Error(w, http.StatusText(status), status)
 }
 
 // Обертка ClientError для отправки статуса Not Found
-func (l *AppLogger) NotFound(w http.ResponseWriter) {
+func (l *LogHelper) NotFound(w http.ResponseWriter) {
 	l.ClientError(w, http.StatusNotFound)
 }
 
