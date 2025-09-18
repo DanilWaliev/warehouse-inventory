@@ -1,8 +1,69 @@
-package main
+package api
+
+import (
+	"fmt"
+	"net/http"
+	"strings"
+	"warehouse-inventory/pkg/handlers"
+)
+
+type APIHandler struct {
+	helper           handlers.LogHelper
+	componentHandler componentHandler
+	userHandler      userHandler
+}
+
+func (h *APIHandler) Component(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		// Парсинг аргументов в URL
+		componentType := r.URL.Query().Get("type")
+		id := r.URL.Query().Get("id")
+
+		fmt.Printf("type=%s\nid=%s", componentType, id)
+	case http.MethodPost:
+		//
+	case http.MethodPut:
+		//
+	case http.MethodDelete:
+		//
+	default:
+		w.Header().Set("Allow", strings.Join([]string{
+			http.MethodPost,
+			http.MethodGet,
+			http.MethodPut,
+			http.MethodDelete,
+		}, ", "))
+
+		h.helper.ClientError(w, http.StatusMethodNotAllowed)
+	}
+}
+
+func (h *APIHandler) User(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		//
+	case http.MethodPost:
+		//
+	case http.MethodPut:
+		//
+	case http.MethodDelete:
+	//
+	default:
+		w.Header().Set("Allow", strings.Join([]string{
+			http.MethodPost,
+			http.MethodGet,
+			http.MethodPut,
+			http.MethodDelete,
+		}, ", "))
+
+		h.helper.ClientError(w, http.StatusMethodNotAllowed)
+	}
+}
 
 /* Файл содержит обработчики для запросов к API (получение, удаление, изменение данных) из отображаемой страницы */
 
-// func (app *application) GetTMCByType(w http.ResponseWriter, r *http.Request) {
+// func (h *APIHandler) GetByType(w http.ResponseWriter, r *http.Request) {
 
 // 	// Получаем список всех компонентов (ТМЦ) из БД
 // 	componentType := r.URL.Query().Get("type")
@@ -10,13 +71,13 @@ package main
 // 	var components []*models.Component
 // 	var err error
 // 	if componentType == "all" {
-// 		components, err = app.models.ComponentModel.GetAll()
+// 		components, err = h.models.ComponentModel.GetAll()
 // 	} else {
-// 		components, err = app.models.ComponentModel.GetByType(componentType)
+// 		components, err = h.models.ComponentModel.GetByType(componentType)
 // 	}
 
 // 	if err != nil {
-// 		app.serverError(w, err)
+// 		h.serverError(w, err)
 // 	}
 
 // 	// Кодириуем в JSON и отправляем
@@ -27,19 +88,10 @@ package main
 // 	}
 // }
 
-// func (app *application) GetTMCByID(w http.ResponseWriter, r *http.Request) {
+// func (h *APIHandler) GetTMCByID(w http.ResponseWriter, r *http.Request) {
 // 	if r.Method != http.MethodPost {
 // 		w.Header().Set("Allow", http.MethodPost)
 // 		app.clientError(w, http.StatusMethodNotAllowed)
-// 		return
-// 	}
-
-// 	// Авторизация
-// 	if role, err := app.auth(r); role != "admin" && role != "productionmanager" {
-// 		app.clientError(w, http.StatusUnauthorized)
-// 		return
-// 	} else if err != nil {
-// 		app.serverError(w, err)
 // 		return
 // 	}
 
@@ -69,19 +121,10 @@ package main
 // 	}
 // }
 
-// func (app *application) CreateTMC(w http.ResponseWriter, r *http.Request) {
+// func (h *APIHandler) CreateTMC(w http.ResponseWriter, r *http.Request) {
 // 	if r.Method != http.MethodPost {
 // 		w.Header().Set("Allow", http.MethodPost)
 // 		app.clientError(w, http.StatusMethodNotAllowed)
-// 		return
-// 	}
-
-// 	// Авторизация
-// 	if role, err := app.auth(r); role != "admin" && role != "productionmanager" {
-// 		app.clientError(w, http.StatusUnauthorized)
-// 		return
-// 	} else if err != nil {
-// 		app.serverError(w, err)
 // 		return
 // 	}
 
@@ -121,19 +164,10 @@ package main
 // 	}
 // }
 
-// func (app *application) DeleteTMC(w http.ResponseWriter, r *http.Request) {
+// func (h *APIHandler) DeleteTMC(w http.ResponseWriter, r *http.Request) {
 // 	if r.Method != http.MethodPost {
 // 		w.Header().Set("Allow", http.MethodPost)
 // 		app.clientError(w, http.StatusMethodNotAllowed)
-// 		return
-// 	}
-
-// 	// Авторизация
-// 	if role, err := app.auth(r); role != "admin" && role != "productionmanager" {
-// 		app.clientError(w, http.StatusUnauthorized)
-// 		return
-// 	} else if err != nil {
-// 		app.serverError(w, err)
 // 		return
 // 	}
 
@@ -160,15 +194,6 @@ package main
 // 	if r.Method != http.MethodPost {
 // 		w.Header().Set("Allow", http.MethodPost)
 // 		app.clientError(w, http.StatusMethodNotAllowed)
-// 		return
-// 	}
-
-// 	// Авторизация
-// 	if role, err := app.auth(r); role != "admin" && role != "productionmanager" {
-// 		app.clientError(w, http.StatusUnauthorized)
-// 		return
-// 	} else if err != nil {
-// 		app.serverError(w, err)
 // 		return
 // 	}
 

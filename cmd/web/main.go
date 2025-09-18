@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"os"
 	"text/template"
+	"warehouse-inventory/pkg/handlers/api"
+	"warehouse-inventory/pkg/handlers/pages"
 	"warehouse-inventory/pkg/models/mysql"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -15,9 +17,22 @@ import (
 type application struct {
 	errorLog      *log.Logger
 	infolog       *log.Logger
+	JWTkey        []byte
 	templateCache map[string]*template.Template
 	models        *mysql.MySQLModels
-	JWTkey        []byte
+
+	pageHandler pages.PageHandler
+	apiHandler  api.APIHandler
+}
+
+func newApplication(
+	errorLog, infoLog *log.Logger,
+	JWTkey []byte,
+	templateCache map[string]*template.Template,
+	models *mysql.MySQLModels,
+	pageHandler pages.PageHandler,
+	apiHandler api.APIHandler) *application {
+	pageHandler := 
 }
 
 func main() {

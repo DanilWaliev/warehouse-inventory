@@ -50,7 +50,7 @@ func (m *UserModel) ExistsByEmail(email string) (bool, error) {
 	return true, nil
 }
 
-func (m *UserModel) InsertUser(fullname, phone, email, password, role string) error {
+func (m *UserModel) Insert(fullname, phone, email, password, role string) error {
 	stmt := `INSERT INTO user(Fullname, Phone, Email, Passwordhash, Role)
 	VALUES (?, ?, ?, ?, ?)`
 
