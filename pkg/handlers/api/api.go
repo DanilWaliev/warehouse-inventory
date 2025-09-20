@@ -5,12 +5,23 @@ import (
 	"net/http"
 	"strings"
 	"warehouse-inventory/pkg/handlers"
+	"warehouse-inventory/pkg/services"
 )
 
+/* Обработчики запросов к API. Обработчики в зависимости от HTTP-метода вызывают методы соответствующих структур */
+
 type APIHandler struct {
-	helper           handlers.LogHelper
-	componentHandler componentHandler
-	userHandler      userHandler
+	Helper           *handlers.LogHelper
+	ComponentHandler *ComponentHandler
+	UserHandler      *UserHandler
+}
+
+func NewAPIHandler(helper *handlers.LogHelper, services *services.Services) *APIHandler {
+	return &APIHandler{
+		Helper:           helper,
+		ComponentHandler: NewComponentHandler(services.ComponentService),
+		UserHandler:      NewUserHandler(services.UserService),
+	}
 }
 
 func (h *APIHandler) Component(w http.ResponseWriter, r *http.Request) {
@@ -35,7 +46,7 @@ func (h *APIHandler) Component(w http.ResponseWriter, r *http.Request) {
 			http.MethodDelete,
 		}, ", "))
 
-		h.helper.ClientError(w, http.StatusMethodNotAllowed)
+		h.Helper.ClientError(w, http.StatusMethodNotAllowed)
 	}
 }
 
@@ -57,7 +68,7 @@ func (h *APIHandler) User(w http.ResponseWriter, r *http.Request) {
 			http.MethodDelete,
 		}, ", "))
 
-		h.helper.ClientError(w, http.StatusMethodNotAllowed)
+		h.Helper.ClientError(w, http.StatusMethodNotAllowed)
 	}
 }
 

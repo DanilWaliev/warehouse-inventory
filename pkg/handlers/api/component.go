@@ -5,10 +5,16 @@ import (
 	"warehouse-inventory/pkg/services"
 )
 
-type componentHandler struct {
-	services.ComponentService
+type ComponentHandler struct {
+	ComponentService *services.ComponentService
 }
 
-func (h *componentHandler) GetAll() ([]*models.Component, error) {
+func NewComponentHandler(componentServices *services.ComponentService) *ComponentHandler {
+	return &ComponentHandler{
+		ComponentService: componentServices,
+	}
+}
+
+func (h *ComponentHandler) GetAll() ([]*models.Component, error) {
 	return h.ComponentService.GetAll()
 }

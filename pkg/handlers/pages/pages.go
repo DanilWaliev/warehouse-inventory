@@ -6,22 +6,26 @@ import (
 )
 
 type PageHandler struct {
-	renderer handlers.Renderer
-	helper   handlers.LogHelper
+	Renderer *handlers.Renderer
+	Helper   *handlers.LogHelper
+}
+
+func NewPageHandler(renderer *handlers.Renderer, helper *handlers.LogHelper) *PageHandler {
+	return &PageHandler{
+		Renderer: renderer,
+		Helper:   helper,
+	}
 }
 
 func (h *PageHandler) Root(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
-		h.helper.NotFound(w)
+		h.Helper.NotFound(w)
 		return
 	}
 
-	// // Авторизация
-	// role, err := app.auth(r)
-	// if err != nil || role == "" {
-	// 	http.Redirect(w, r, "/signin", http.StatusFound)
-	// 	return
-	// }
+	h.Renderer.Render(w, "main.page.tmpl", nil)
+}
 
-	h.renderer.Render(w, "main.page.tmpl", nil)
+func (h *PageHandler) Production(w http.ResponseWriter, r *http.Request) {
+	h.Renderer.Render(w, "production.page.tmpl", nil)
 }

@@ -7,9 +7,12 @@ import (
 	"net/http"
 	"os"
 	"text/template"
+	"warehouse-inventory/pkg/handlers"
 	"warehouse-inventory/pkg/handlers/api"
+	"warehouse-inventory/pkg/handlers/auth"
 	"warehouse-inventory/pkg/handlers/pages"
 	"warehouse-inventory/pkg/models/mysql"
+	"warehouse-inventory/pkg/services"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -19,20 +22,43 @@ type application struct {
 	infolog       *log.Logger
 	JWTkey        []byte
 	templateCache map[string]*template.Template
-	models        *mysql.MySQLModels
 
-	pageHandler pages.PageHandler
-	apiHandler  api.APIHandler
+	models      *mysql.MySQLModels
+	pageHandler *pages.PageHandler
+	apiHandler  *api.APIHandler
+	authHandler *auth.AuthHandler
 }
 
 func newApplication(
 	errorLog, infoLog *log.Logger,
 	JWTkey []byte,
 	templateCache map[string]*template.Template,
-	models *mysql.MySQLModels,
-	pageHandler pages.PageHandler,
-	apiHandler api.APIHandler) *application {
-	pageHandler := 
+	db *sql.DB) *application {
+	// Модели
+	models := mysql.NewMySQLModels(db)
+
+	// Сервисы
+	services := services.NewServices(models)
+
+	// Хелпер, рендерер
+	helper := handlers.NewLogHelper(errorLog)
+	renderer := handlers.NewRenderer(templateCache)
+
+	// Обработчики
+	apiHandler := api.NewAPIHandler(helper, services)
+	pageHandler := pages.NewPageHandler(renderer, helper)
+	authHandler := auth.NewAuthHandler(JWTkey, helper, services.UserService)
+
+	return &application{
+		errorLog:      errorLog,
+		infolog:       infoLog,
+		JWTkey:        JWTkey,
+		templateCache: templateCache,
+
+		apiHandler:  apiHandler,
+		pageHandler: pageHandler,
+		authHandler: authHandler,
+	}
 }
 
 func main() {
@@ -56,13 +82,9 @@ func main() {
 	}
 
 	// Инициализируем структуру приложения с нужными зависимостями
-	app := &application{
-		errorLog:      errorLog,
-		infolog:       infoLog,
-		templateCache: templateCache,
-		models:        mysql.NewMySQLModels(db),
-		JWTkey:        []byte("super secret key"), // TODO: убрать временную заглушку
-	}
+	JWTkey := []byte("super secret key") // TODO: Убрать временную заглушку
+
+	app := newApplication(errorLog, infoLog, JWTkey, templateCache, db)
 
 	// Инициализация структуры сервера
 	srv := &http.Server{

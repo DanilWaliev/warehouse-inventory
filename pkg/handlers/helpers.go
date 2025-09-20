@@ -15,9 +15,21 @@ type LogHelper struct {
 	errorLog *log.Logger
 }
 
+func NewLogHelper(errorLog *log.Logger) *LogHelper {
+	return &LogHelper{
+		errorLog: errorLog,
+	}
+}
+
 // Структура для получения карты кеша шаблонов и рендера страниц
 type Renderer struct {
 	cache map[string]*template.Template
+}
+
+func NewRenderer(cache map[string]*template.Template) *Renderer {
+	return &Renderer{
+		cache: cache,
+	}
 }
 
 // Отправляет Internal Server Error и логирует ошибку

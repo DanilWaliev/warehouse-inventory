@@ -2,6 +2,12 @@ package api
 
 import "warehouse-inventory/pkg/services"
 
-type userHandler struct {
-	userService services.UserService
+type UserHandler struct {
+	UserService *services.UserService
+}
+
+func NewUserHandler(userService *services.UserService) *UserHandler {
+	return &UserHandler{
+		UserService: userService,
+	}
 }

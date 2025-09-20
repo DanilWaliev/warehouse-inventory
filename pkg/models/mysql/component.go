@@ -10,6 +10,12 @@ type ComponentModel struct {
 	DB *sql.DB
 }
 
+func NewComponentModel(db *sql.DB) *ComponentModel {
+	return &ComponentModel{
+		DB: db,
+	}
+}
+
 func (m *ComponentModel) GetByType(componentType string) ([]*models.Component, error) {
 	stmt := `SELECT * From component where Type = ?`
 
