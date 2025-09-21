@@ -13,11 +13,7 @@ func (app *application) routes() *http.ServeMux {
 	mux.HandleFunc("/production", app.authHandler.AccessWithRoles(app.pageHandler.Production, "admin", "productionmanager"))
 
 	// // Запросы к API
-	// mux.HandleFunc("/api/tmc", app.GetTMCByType)
-	// mux.HandleFunc("/api/tmc/get", app.GetTMCByID)
-	// mux.HandleFunc("/api/tmc/create", app.CreateTMC)
-	// mux.HandleFunc("/api/tmc/delete", app.DeleteTMC)
-	// mux.HandleFunc("/api/tmc/edit", app.EditTMC)
+	mux.HandleFunc("/api/tmc", app.apiHandler.Component)
 
 	fileServer := http.FileServer(http.Dir("./ui/static"))
 	mux.Handle("/static/", http.StripPrefix("/static", fileServer))

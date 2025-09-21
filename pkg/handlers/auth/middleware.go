@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 )
 
@@ -55,7 +54,6 @@ func (h *AuthHandler) AccessWithRoles(next http.HandlerFunc, roles ...string) ht
 // Проверяет есть ли среди разрешенных ролей указанная роль пользователя
 func hasRole(allowedRoles []string, userRole string) bool {
 	for _, role := range allowedRoles {
-		fmt.Printf("userRole: %s\nroles: %s\n", userRole, role)
 		if role == userRole {
 			return true
 		}

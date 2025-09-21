@@ -1,7 +1,6 @@
 package api
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 	"warehouse-inventory/pkg/handlers"
@@ -19,25 +18,21 @@ type APIHandler struct {
 func NewAPIHandler(helper *handlers.LogHelper, services *services.Services) *APIHandler {
 	return &APIHandler{
 		Helper:           helper,
-		ComponentHandler: NewComponentHandler(services.ComponentService),
-		UserHandler:      NewUserHandler(services.UserService),
+		ComponentHandler: NewComponentHandler(helper, services.ComponentService),
+		UserHandler:      NewUserHandler(helper, services.UserService),
 	}
 }
 
 func (h *APIHandler) Component(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		// Парсинг аргументов в URL
-		componentType := r.URL.Query().Get("type")
-		id := r.URL.Query().Get("id")
-
-		fmt.Printf("type=%s\nid=%s", componentType, id)
+		h.ComponentHandler.Get(w, r)
 	case http.MethodPost:
-		//
+		h.ComponentHandler.Post(w, r)
 	case http.MethodPut:
-		//
+		h.ComponentHandler.Put(w, r)
 	case http.MethodDelete:
-		//
+		h.ComponentHandler.Delete(w, r)
 	default:
 		w.Header().Set("Allow", strings.Join([]string{
 			http.MethodPost,

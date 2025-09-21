@@ -53,7 +53,8 @@
   // ------------------------+
 
   async function loadTMCtable() {
-    let data = await loadTMCbyType("all")
+    const res = await fetch("/api/tmc")
+    const data = await res.json() 
     const tbody = document.getElementById("table-tmc-body");
     tbody.innerHTML = "";
 
@@ -120,7 +121,7 @@
     }
 
     // Отправляем данные в JSON для создания ТМЦ
-    const res = await fetch("/api/tmc/create", {
+    const res = await fetch("/api/tmc", {
       method: "POST",
       body: JSON.stringify({
         name: name,
@@ -164,10 +165,8 @@
   async function deleteTMC(id) {
     if (!(await showConfirm("Вы действительно хотите удалить ТМЦ?", "Удалить ТМЦ"))) return;
 
-    const res = await fetch(`/api/tmc/delete`, {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({id: id})
+    const res = await fetch(`/api/tmc?id=${id}`, {
+      method: "DELETE",
     });
 
     if (res.ok) {
@@ -192,17 +191,14 @@
 // Редактирование ТМЦ
 async function editTMC(id) {
   // Загрузить данные по ТМЦ
-  const res = await fetch(`/api/tmc/get`, {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({ id: id })
-  });
+  const res = await fetch(`/api/tmc?id=${id}`);
 
   if (!res.ok) {
     showToast("Ошибка загрузки ТМЦ");
     return;
   }
-  const item = await res.json();
+  let item = await res.json();
+  item = item[0]
 
   // Открыть модалку и показать форму ТМЦ
   modal.classList.remove('hidden');
@@ -228,8 +224,17 @@ async function editTMC(id) {
     const type = fd.get("type");
     const note = fd.get("note");
 
-    const updRes = await fetch("/api/tmc/edit", {
-      method: "POST",
+    // Валидация данных
+    if (name.length > 255 ||
+      note.length > 45 ||
+      weight <= 0
+    ) {
+      showToast("Некорректные данные");
+      return;
+    }
+
+    const updRes = await fetch("/api/tmc", {
+      method: "PUT",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({ id, name, weight, type, note }),
     });

@@ -16,7 +16,7 @@ func NewComponentModel(db *sql.DB) *ComponentModel {
 	}
 }
 
-func (m *ComponentModel) GetByType(componentType string) ([]*models.Component, error) {
+func (m *ComponentModel) SelectByType(componentType string) ([]*models.Component, error) {
 	stmt := `SELECT * From component where Type = ?`
 
 	rows, err := m.DB.Query(stmt, componentType)
@@ -52,7 +52,7 @@ func (m *ComponentModel) GetByType(componentType string) ([]*models.Component, e
 }
 
 // Возвращает компонент с определенным ID
-func (m *ComponentModel) GetByID(id int) (*models.Component, error) {
+func (m *ComponentModel) SelectByID(id int) (*models.Component, error) {
 	stmt := `SELECT * FROM component
 	WHERE Component_ID = ?`
 
@@ -74,7 +74,7 @@ func (m *ComponentModel) GetByID(id int) (*models.Component, error) {
 }
 
 // Возвращает все компоненты с таблицы
-func (m *ComponentModel) GetAll() ([]*models.Component, error) {
+func (m *ComponentModel) SelectAll() ([]*models.Component, error) {
 	stmt := `SELECT * From component`
 
 	rows, err := m.DB.Query(stmt)
