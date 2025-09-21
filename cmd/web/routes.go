@@ -12,8 +12,8 @@ func (app *application) routes() *http.ServeMux {
 
 	mux.HandleFunc("/production", app.authHandler.AccessWithRoles(app.pageHandler.Production, "admin", "productionmanager"))
 
-	// // Запросы к API
-	mux.HandleFunc("/api/tmc", app.apiHandler.Component)
+	// Запросы к API
+	mux.HandleFunc("/api/tmc", app.authHandler.AccessWithRoles(app.apiHandler.Component, "admin", "productionmanager"))
 
 	fileServer := http.FileServer(http.Dir("./ui/static"))
 	mux.Handle("/static/", http.StripPrefix("/static", fileServer))
