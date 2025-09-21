@@ -27,3 +27,13 @@ type User struct {
 	Phone        string
 	CreatedAt    time.Time
 }
+
+type Recipe struct {
+	Result Component
+	Items  []RecipeItem
+}
+
+type RecipeItem struct {
+	Ingredient Component
+	Quantity   int
+}

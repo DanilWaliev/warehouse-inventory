@@ -273,8 +273,8 @@ async function editTMC(id) {
   // ------------------------------+
 
   async function loadProductAndSemiTMC() {
-    const res = await fetch("/api/tmc?type=product, semi")
-
+    const res = await fetch("/api/tmc?type=product&type=semi")
+    
     
   }
 
