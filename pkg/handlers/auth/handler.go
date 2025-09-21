@@ -17,10 +17,11 @@ type AuthHandler struct {
 	UserService *services.UserService
 }
 
-func NewAuthHandler(JWTkey []byte, helper *handlers.LogHelper, userService *services.UserService) *AuthHandler {
+func NewAuthHandler(JWTkey []byte, helper *handlers.LogHelper, renderer *handlers.Renderer, userService *services.UserService) *AuthHandler {
 	return &AuthHandler{
 		JWTkey:      JWTkey,
 		helper:      helper,
+		renderer:    renderer,
 		UserService: userService,
 	}
 }

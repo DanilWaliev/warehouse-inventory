@@ -23,7 +23,6 @@ type application struct {
 	JWTkey        []byte
 	templateCache map[string]*template.Template
 
-	models      *mysql.MySQLModels
 	pageHandler *pages.PageHandler
 	apiHandler  *api.APIHandler
 	authHandler *auth.AuthHandler
@@ -47,7 +46,7 @@ func newApplication(
 	// Обработчики
 	apiHandler := api.NewAPIHandler(helper, services)
 	pageHandler := pages.NewPageHandler(renderer, helper)
-	authHandler := auth.NewAuthHandler(JWTkey, helper, services.UserService)
+	authHandler := auth.NewAuthHandler(JWTkey, helper, renderer, services.UserService)
 
 	return &application{
 		errorLog:      errorLog,

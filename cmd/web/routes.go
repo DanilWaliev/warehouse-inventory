@@ -6,12 +6,11 @@ func (app *application) routes() *http.ServeMux {
 	mux := http.NewServeMux()
 	// Запросы к связанные с auth
 	mux.HandleFunc("/", app.authHandler.RequireAuth(app.pageHandler.Root))
-	// mux.HandleFunc("/", app.pageHandler.Root)
 	mux.HandleFunc("/signin", app.authHandler.SignIn)
 	mux.HandleFunc("/signup", app.authHandler.SignUp)
 	mux.HandleFunc("/signout", app.authHandler.SignOut)
 
-	mux.HandleFunc("/production", app.pageHandler.Production)
+	mux.HandleFunc("/production", app.authHandler.AccessWithRoles(app.pageHandler.Production, "admin", "productionmanager"))
 
 	// // Запросы к API
 	// mux.HandleFunc("/api/tmc", app.GetTMCByType)

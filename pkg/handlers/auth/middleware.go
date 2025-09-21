@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 )
 
@@ -12,7 +13,7 @@ func (h *AuthHandler) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claims, err := h.ParseToken(r)
 		if err != nil {
-			h.helper.ClientError(w, http.StatusUnauthorized)
+			http.Redirect(w, r, "/signin", http.StatusFound)
 			return
 		}
 
@@ -27,7 +28,7 @@ func (h *AuthHandler) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 }
 
 // Проверяет имеет ли пользователь из контекста запроса указанную роль, если имеет
-func (h *AuthHandler) RequireRole(next http.HandlerFunc, role string) http.HandlerFunc {
+func (h *AuthHandler) RequireRoles(next http.HandlerFunc, roles []string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctxUser := r.Context().Value(userContextKey)
 		if ctxUser == nil {
@@ -37,7 +38,7 @@ func (h *AuthHandler) RequireRole(next http.HandlerFunc, role string) http.Handl
 
 		user := ctxUser.(*AuthorizedUser)
 
-		if user.Role != role {
+		if !hasRole(roles, user.Role) {
 			h.helper.ClientError(w, http.StatusForbidden)
 			return
 		}
@@ -46,6 +47,18 @@ func (h *AuthHandler) RequireRole(next http.HandlerFunc, role string) http.Handl
 	}
 }
 
-func (h *AuthHandler) AccessWithRole(role string, next http.HandlerFunc) http.HandlerFunc {
-	return h.RequireAuth(h.RequireRole(next, role))
+// Обертка, чтобы проверять роли и авторизацию
+func (h *AuthHandler) AccessWithRoles(next http.HandlerFunc, roles ...string) http.HandlerFunc {
+	return h.RequireAuth(h.RequireRoles(next, roles))
+}
+
+// Проверяет есть ли среди разрешенных ролей указанная роль пользователя
+func hasRole(allowedRoles []string, userRole string) bool {
+	for _, role := range allowedRoles {
+		fmt.Printf("userRole: %s\nroles: %s\n", userRole, role)
+		if role == userRole {
+			return true
+		}
+	}
+	return false
 }
