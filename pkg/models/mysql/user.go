@@ -3,7 +3,6 @@ package mysql
 import (
 	"database/sql"
 	"errors"
-	"warehouse-inventory/pkg/hash"
 	"warehouse-inventory/pkg/models"
 )
 
@@ -12,6 +11,12 @@ import (
 
 type UserModel struct {
 	DB *sql.DB
+}
+
+func NewUserModel(db *sql.DB) *UserModel {
+	return &UserModel{
+		DB: db,
+	}
 }
 
 func (m *UserModel) GetByEmail(email string) (*models.User, error) {
@@ -50,17 +55,11 @@ func (m *UserModel) ExistsByEmail(email string) (bool, error) {
 	return true, nil
 }
 
-func (m *UserModel) InsertUser(fullname, phone, email, password, role string) error {
+func (m *UserModel) Insert(fullname, phone, email, passwordHash, role string) error {
 	stmt := `INSERT INTO user(Fullname, Phone, Email, Passwordhash, Role)
 	VALUES (?, ?, ?, ?, ?)`
 
-	passwordHash, err := hash.HashPassword(password)
-
-	if err != nil {
-		return err
-	}
-
-	_, err = m.DB.Exec(stmt, fullname, phone, email, passwordHash, role)
+	_, err := m.DB.Exec(stmt, fullname, phone, email, passwordHash, role)
 
 	if err != nil {
 		return err

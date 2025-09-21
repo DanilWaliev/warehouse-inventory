@@ -4,19 +4,16 @@ import "net/http"
 
 func (app *application) routes() *http.ServeMux {
 	mux := http.NewServeMux()
-	// Запросы к страницам
-	mux.HandleFunc("/", app.root)
-	mux.HandleFunc("/signin", app.signIn)
-	mux.HandleFunc("/signup", app.signUp)
-	mux.HandleFunc("/signout", app.signOut)
-	mux.HandleFunc("/production", app.production)
+	// Запросы к связанные с auth
+	mux.HandleFunc("/", app.authHandler.RequireAuth(app.pageHandler.Root))
+	mux.HandleFunc("/signin", app.authHandler.SignIn)
+	mux.HandleFunc("/signup", app.authHandler.SignUp)
+	mux.HandleFunc("/signout", app.authHandler.SignOut)
 
-	// Запросы к API
-	mux.HandleFunc("/api/tmc", app.GetTMCByType)
-	mux.HandleFunc("/api/tmc/get", app.GetTMCByID)
-	mux.HandleFunc("/api/tmc/create", app.CreateTMC)
-	mux.HandleFunc("/api/tmc/delete", app.DeleteTMC)
-	mux.HandleFunc("/api/tmc/edit", app.EditTMC)
+	mux.HandleFunc("/production", app.authHandler.AccessWithRoles(app.pageHandler.Production, "admin", "productionmanager"))
+
+	// // Запросы к API
+	mux.HandleFunc("/api/tmc", app.apiHandler.Component)
 
 	fileServer := http.FileServer(http.Dir("./ui/static"))
 	mux.Handle("/static/", http.StripPrefix("/static", fileServer))

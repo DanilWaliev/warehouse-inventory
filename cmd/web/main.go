@@ -7,7 +7,12 @@ import (
 	"net/http"
 	"os"
 	"text/template"
+	"warehouse-inventory/pkg/handlers"
+	"warehouse-inventory/pkg/handlers/api"
+	"warehouse-inventory/pkg/handlers/auth"
+	"warehouse-inventory/pkg/handlers/pages"
 	"warehouse-inventory/pkg/models/mysql"
+	"warehouse-inventory/pkg/services"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -15,9 +20,44 @@ import (
 type application struct {
 	errorLog      *log.Logger
 	infolog       *log.Logger
-	templateCache map[string]*template.Template
-	models        *mysql.MySQLModels
 	JWTkey        []byte
+	templateCache map[string]*template.Template
+
+	pageHandler *pages.PageHandler
+	apiHandler  *api.APIHandler
+	authHandler *auth.AuthHandler
+}
+
+func newApplication(
+	errorLog, infoLog *log.Logger,
+	JWTkey []byte,
+	templateCache map[string]*template.Template,
+	db *sql.DB) *application {
+	// Модели
+	models := mysql.NewMySQLModels(db)
+
+	// Сервисы
+	services := services.NewServices(models)
+
+	// Хелпер, рендерер
+	helper := handlers.NewLogHelper(errorLog)
+	renderer := handlers.NewRenderer(templateCache)
+
+	// Обработчики
+	apiHandler := api.NewAPIHandler(helper, services)
+	pageHandler := pages.NewPageHandler(renderer, helper)
+	authHandler := auth.NewAuthHandler(JWTkey, helper, renderer, services.UserService)
+
+	return &application{
+		errorLog:      errorLog,
+		infolog:       infoLog,
+		JWTkey:        JWTkey,
+		templateCache: templateCache,
+
+		apiHandler:  apiHandler,
+		pageHandler: pageHandler,
+		authHandler: authHandler,
+	}
 }
 
 func main() {
@@ -41,13 +81,9 @@ func main() {
 	}
 
 	// Инициализируем структуру приложения с нужными зависимостями
-	app := &application{
-		errorLog:      errorLog,
-		infolog:       infoLog,
-		templateCache: templateCache,
-		models:        mysql.NewMySQLModels(db),
-		JWTkey:        []byte("super secret key"), // TODO: убрать временную заглушку
-	}
+	JWTkey := []byte("super secret key") // TODO: Убрать временную заглушку
+
+	app := newApplication(errorLog, infoLog, JWTkey, templateCache, db)
 
 	// Инициализация структуры сервера
 	srv := &http.Server{
