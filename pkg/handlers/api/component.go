@@ -108,6 +108,8 @@ func (h *ComponentHandler) Post(w http.ResponseWriter, r *http.Request) {
 			h.Helper.ServerError(w, err)
 		}
 	}
+
+	w.WriteHeader(http.StatusCreated)
 }
 
 // Принимает JSON данные для обновления компонента
@@ -147,6 +149,8 @@ func (h *ComponentHandler) Put(w http.ResponseWriter, r *http.Request) {
 			fmt.Printf("%+v", err)
 		}
 	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 // Принимает в параметре URL Id компонента, который надо удалить
@@ -161,4 +165,6 @@ func (h *ComponentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.Helper.ServerError(w, err)
 	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
