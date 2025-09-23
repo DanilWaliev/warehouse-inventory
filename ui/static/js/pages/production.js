@@ -33,7 +33,7 @@
         loadTMCtable();
         break;
       case "recipe":
-        //loadAllRecipe();
+        loadRecipesTable();
         break;
       case "order":
         //loadAllOrder();
@@ -53,16 +53,19 @@
   // ------------------------+
 
   async function loadTMCtable() {
-    const res = await fetch("/api/tmc")
-    const data = await res.json() 
     const tbody = document.getElementById("table-tmc-body");
     tbody.innerHTML = "";
-
-    if (!data || data.length === 0) {
-      const tr = document.createElement("tr");
-      tr.innerHTML=`<tr><td colspan="5" class="text-muted">Нет ТМЦ</td></tr>`;
-      tbody.appendChild(tr);
+    const res = await fetch("/api/tmc")
+    if (!res.ok) {
+      if (res.status === 404) {
+        const tr = document.createElement("tr");
+        tr.innerHTML=`<tr><td colspan="5" class="text-muted">Нет ТМЦ</td></tr>`;
+        tbody.appendChild(tr);
+      } else {
+        showToast("Ошибка при загрузке ТМЦ")
+      }
     } else {
+      const data = await res.json() 
       data.forEach(item => {
         // Переводим тип ТМЦ на русский:
         switch (item.Type) {
@@ -76,24 +79,21 @@
             item.Type = "Продукт";
             break;
         }
-
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-      <td>${item.Name}</td>
-      <td>${item.Weight}</td>
-      <td>${item.Type}</td>
-      <td>${item.Note}</td>
-      <td>
-        <button class="btn-delete">Удалить</button>
-        <button class="btn-edit">Изменить</button>
-      </td>
-      `;
-
-      tr.querySelector(".btn-delete").addEventListener("click", () => deleteTMC(item.ID));
-      tr.querySelector(".btn-edit").addEventListener("click", () => editTMC(item.ID));
-
-      tbody.appendChild(tr)
-    });
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+        <td>${item.Name}</td>
+        <td>${item.Weight}</td>
+        <td>${item.Type}</td>
+        <td>${item.Note}</td>
+        <td>
+          <button class="btn-delete">Удалить</button>
+          <button class="btn-edit">Изменить</button>
+        </td>
+        `;
+        tr.querySelector(".btn-delete").addEventListener("click", () => deleteTMC(item.ID));
+        tr.querySelector(".btn-edit").addEventListener("click", () => editTMC(item.ID));
+        tbody.appendChild(tr)
+      });
     }
   }
 
@@ -269,14 +269,197 @@ async function editTMC(id) {
 }
   
   // ------------------------------+
-  // Скрипты для раздела Рецептуры |
-  // ------------------------------+
+// Скрипты для раздела Рецептуры |
+// ------------------------------+
 
-  async function loadProductAndSemiTMC() {
-    const res = await fetch("/api/tmc?type=product&type=semi")
-    
-    
+// Загрузка таблицы рецептур
+async function loadRecipesTable() {
+  const tbody = document.getElementById("table-recipe-body");
+  tbody.innerHTML = "";
+  const res = await fetch("/api/recipe");
+  if (!res.ok) {
+    if (res.status === 404) {
+      const tr = document.createElement("tr");
+        tr.innerHTML=`<tr><td colspan="5" class="text-muted">Нет рецептур</td></tr>`;
+        tbody.appendChild(tr);
+    } else {
+      showToast("Ошибка загрузки рецептур");
+    }
+  } else {
+    const data = await res.json();
+    data.forEach(recipe => {
+      // Перевод типа результата на русский
+      let resultType = recipe.Result.Type;
+      switch (resultType) {
+        case "raw": resultType = "Сырье"; break;
+        case "semi": resultType = "Полуфабрикат"; break;
+        case "product": resultType = "Продукт"; break;
+      }
+
+      // Формируем список ингредиентов
+      const ingredientsHTML = recipe.Items.map(item => {
+        let t = item.Ingredient.Type;
+        switch (t) {
+          case "raw": t = "Сырье"; break;
+          case "semi": t = "Полуфабрикат"; break;
+          case "product": t = "Продукт"; break;
+        }
+        return `${item.Ingredient.Name} (${t}) × ${item.Quantity}`;
+      }).join("<br>");
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${recipe.Result.Name}</td>
+        <td>${resultType}</td>
+        <td>${ingredientsHTML}</td>
+        <td>
+          <button class="btn-delete">Удалить</button>
+          <button class="btn-edit">Изменить</button>
+        </td>
+      `;
+
+      tr.querySelector(".btn-delete").addEventListener("click", () => deleteRecipe(recipe.Result.ID));
+      tr.querySelector(".btn-edit").addEventListener("click", () => editRecipe(recipe.Result.ID));
+
+      tbody.appendChild(tr);
+    });
   }
+
+  
+}
+
+
+// Подгрузка результирующих ТМЦ (semi + product) в селект результата
+async function loadResultTMCSelect() {
+  const res = await fetch("/api/tmc?type=semi&type=product");
+  if (!res.ok) {
+    showToast("Ошибка загрузки списка ТМЦ");
+    return;
+  }
+  const list = await res.json();
+  const select = document.getElementById("result-tmc");
+  select.innerHTML = "";
+
+  list.forEach(tmc => {
+    const option = document.createElement("option");
+    option.value = tmc.ID;
+    option.textContent = tmc.Name;
+    select.appendChild(option);
+  });
+}
+
+// Подгрузка всех ТМЦ в селект ингредиента
+async function loadAllTMCSelect(selectEl) {
+  const res = await fetch("/api/tmc");
+  if (!res.ok) {
+    showToast("Ошибка загрузки ингредиентов");
+    return;
+  }
+  const list = await res.json();
+  selectEl.innerHTML = "";
+
+  list.forEach(tmc => {
+    const option = document.createElement("option");
+    option.value = tmc.ID;
+    option.textContent = tmc.Name;
+    selectEl.appendChild(option);
+  });
+}
+
+// Добавление строки ингредиента
+function addIngredientRow() {
+  const container = document.getElementById("ingredients-list");
+  const div = document.createElement("div");
+  div.className = "ingredient-row mb-2 flex gap-2";
+
+  div.innerHTML = `
+    <select name="ingredient-id" class="flex-1"></select>
+    <input type="number" name="ingredient-qty" value="1" min="1" class="w-20">
+    <button type="button" class="btn btn-secondary btn-sm remove-ing">×</button>
+  `;
+
+  container.appendChild(div);
+
+  // Подгрузить все ТМЦ в селект ингредиента
+  const select = div.querySelector("select[name='ingredient-id']");
+  loadAllTMCSelect(select);
+
+  // Кнопка удаления строки
+  div.querySelector(".remove-ing").addEventListener("click", () => div.remove());
+}
+
+// Отправление запроса на создание Рецептуры
+async function createRecipe(e) {
+  e.preventDefault();
+
+  const form = e.target;
+  const formData = new FormData(form);
+
+  const resultId = formData.get("result-tmc-id");
+
+  // Собираем ингредиенты
+  const ingredients = [];
+  const rows = document.querySelectorAll("#ingredients-list .ingredient-row");
+  rows.forEach(row => {
+    const compId = row.querySelector("select[name='ingredient-id']").value;
+    const qty = row.querySelector("input[name='ingredient-qty']").value;
+    if (compId && qty > 0) {
+      ingredients.push({
+        componentId: parseInt(compId, 10),
+        quantity: parseInt(qty, 10)
+      });
+    }
+  });
+
+  // Валидация
+  if (!resultId) {
+    showToast("Выберите результирующий компонент");
+    return;
+  }
+  if (ingredients.length === 0) {
+    showToast("Добавьте хотя бы один ингредиент");
+    return;
+  }
+
+  // Отправляем JSON на сервер
+  const res = await fetch("/api/recipe", {
+    method: "POST",
+    body: JSON.stringify({
+      resultId: parseInt(resultId, 10),
+      items: ingredients
+    }),
+    headers: {
+      "Content-Type": "application/json"
+    }
+  });
+
+  if (res.ok) {
+    form.reset();
+    document.getElementById("ingredients-list").innerHTML = ""; // очистить список
+    closeModal();
+    loadRecipesTable();
+    showToast("Рецептура успешно создана", "success");
+  } else {
+    switch (res.status) {
+      case 401: showToast("Нет доступа"); break;
+      case 400: showToast("Некорректные данные"); break;
+      case 409: showToast("Такая рецептура уже существует"); break;
+      case 500: showToast("Ошибка на стороне сервера"); break;
+      default:  showToast("Ошибка при создании рецептуры");
+    }
+  }
+}// TODO: пофиксить форму создания рецептуры
+
+// Кнопка "Добавить ингредиент"
+document.getElementById("add-ingredient").addEventListener("click", addIngredientRow);
+
+// Загружаем список возможных "результатов" при открытии модалки рецептуры
+function openRecipeModal() {
+  loadResultTMCSelect();
+  document.getElementById("ingredients-list").innerHTML = "";
+  addIngredientRow(); // чтобы хотя бы одна строка была
+}
+
 
   // ---------------------------+
   // Скрипты для раздела Заказы |
@@ -297,9 +480,14 @@ async function editTMC(id) {
     Object.keys(forms).forEach(k => forms[k].classList.toggle('hidden', k !== active));
     // блокируем скролл страницы
     document.body.style.overflow = 'hidden';
+
+    if (active == "recipe") {
+      openRecipeModal()
+    }
   }
 
   forms.tmc.onsubmit = createTMC;
+  forms.recipe.onsubmit = createRecipe;
 
   function closeModal() {
   modal.classList.add('hidden');
@@ -320,18 +508,6 @@ async function editTMC(id) {
   document.getElementById('modal-cancel').addEventListener('click', closeModal);
   document.getElementById('modal-cancel-2').addEventListener('click', closeModal);
   document.getElementById('modal-cancel-3').addEventListener('click', closeModal);
-
-  // Добавление ингредиента в форму рецептуры
-  let ingIndex = 1;
-  const addIngBtn = document.getElementById('add-ingredient');
-  addIngBtn && addIngBtn.addEventListener('click', () => {
-    const container = document.getElementById('recipe-ingredients');
-    const div = document.createElement('div');
-    div.className = 'mb-2 flex gap-2';
-    div.innerHTML = container.firstElementChild.innerHTML.replace(/\[0\]/g, '[' + ingIndex + ']').replace(/ingredients\[0\]/g,'ingredients['+ingIndex+']');
-    container.appendChild(div);
-    ingIndex++;
-  });
 
   // Подстройка отступа для sidebar, чтобы он не перекрывал хедер
   function updateHeaderOffset() {

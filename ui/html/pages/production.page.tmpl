@@ -147,7 +147,12 @@
 
         <div class="mb-4">
           <p><label>Ингредиенты</label></p>
-          <div id="ingredients-list"></div>
+          <div id="ingredients-list">
+            <div class="ingredient-row">
+              <select name="ingredient-id">...</select>
+              <input type="number" name="ingredient-qty" min="1" value="1">
+            </div>
+          </div>
           <button type="button" class="btn btn-secondary mt-2" id="add-ingredient">+ Добавить</button>
         </div>
 

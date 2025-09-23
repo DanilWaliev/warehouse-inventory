@@ -6,7 +6,15 @@ import (
 )
 
 type RecipeService struct {
-	recipeModel *mysql.RecipeModel
+	recipeModel    *mysql.RecipeModel
+	componentModel *mysql.ComponentModel
+}
+
+func NewRecipeService(recipeModel *mysql.RecipeModel, componentModel *mysql.ComponentModel) *RecipeService {
+	return &RecipeService{
+		recipeModel:    recipeModel,
+		componentModel: componentModel,
+	}
 }
 
 func (s *RecipeService) ReadAll() ([]*models.Recipe, error) {
@@ -29,7 +37,30 @@ func (s *RecipeService) ReadByIDs(ids []int) ([]*models.Recipe, error) {
 }
 
 func (s *RecipeService) Create(recipe *models.Recipe) error {
-	return s.recipeModel.Insert(recipe)
+	// Получаем полные данные об компоненте по полученному ID
+	resultComponent, err := s.componentModel.SelectByID(recipe.Result.ID)
+	if err != nil {
+		return err
+	}
+
+	// Собираем все данные об ингридиенте
+	items := []models.RecipeItem{}
+	for _, item := range recipe.Items {
+		ingredient, err := s.componentModel.SelectByID(item.Ingredient.ID)
+		if err != nil {
+			return err
+		}
+
+		items = append(items, models.RecipeItem{
+			Ingredient: *ingredient,
+			Quantity:   item.Quantity,
+		})
+	}
+
+	return s.recipeModel.Insert(&models.Recipe{
+		Result: *resultComponent,
+		Items:  items,
+	})
 }
 
 func (s *RecipeService) Delete(id int) error {

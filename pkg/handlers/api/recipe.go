@@ -16,6 +16,13 @@ type RecipeHandler struct {
 	RecipeService *services.RecipeService
 }
 
+func NewRecipeHandler(helper *handlers.LogHelper, recipeService *services.RecipeService) *RecipeHandler {
+	return &RecipeHandler{
+		Helper:        helper,
+		RecipeService: recipeService,
+	}
+}
+
 func (h *RecipeHandler) Get(w http.ResponseWriter, r *http.Request) {
 	// GET по id
 	var ids []int
@@ -58,10 +65,10 @@ func (h *RecipeHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *RecipeHandler) Post(w http.ResponseWriter, r *http.Request) {
 	// Структура для приёма JSON
 	var input struct {
-		ResultID int    `json:"result_id"`
+		ResultID int    `json:"resultId"`
 		Type     string `json:"type"`
 		Items    []struct {
-			ComponentID int `json:"component_id"`
+			ComponentID int `json:"componentId"`
 			Quantity    int `json:"quantity"`
 		} `json:"items"`
 	}
@@ -73,16 +80,15 @@ func (h *RecipeHandler) Post(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Проверка минимальных условий
-	if input.ResultID == 0 || input.Type == "" || len(input.Items) == 0 {
+	if input.ResultID == 0 || len(input.Items) == 0 {
 		h.Helper.ClientError(w, http.StatusBadRequest)
 		return
 	}
 
-	// Маппим в модель
+	// Маппим в модель без Type (его подставит сервис)
 	rp := &models.Recipe{
 		Result: models.Component{
-			ID:   input.ResultID,
-			Type: input.Type,
+			ID: input.ResultID,
 		},
 	}
 
