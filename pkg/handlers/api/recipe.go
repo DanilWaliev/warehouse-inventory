@@ -122,10 +122,9 @@ func (h *RecipeHandler) Post(w http.ResponseWriter, r *http.Request) {
 
 func (h *RecipeHandler) Put(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		ResultID int    `json:"result_id"`
-		Type     string `json:"type"`
+		ResultID int `json:"resultId"`
 		Items    []struct {
-			ComponentID int `json:"component_id"`
+			ComponentID int `json:"componentId"`
 			Quantity    int `json:"quantity"`
 		} `json:"items"`
 	}
@@ -135,15 +134,14 @@ func (h *RecipeHandler) Put(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if input.ResultID == 0 || input.Type == "" || len(input.Items) == 0 {
+	if input.ResultID == 0 || len(input.Items) == 0 {
 		h.Helper.ClientError(w, http.StatusBadRequest)
 		return
 	}
 
 	rp := &models.Recipe{
 		Result: models.Component{
-			ID:   input.ResultID,
-			Type: input.Type,
+			ID: input.ResultID,
 		},
 	}
 
@@ -152,6 +150,7 @@ func (h *RecipeHandler) Put(w http.ResponseWriter, r *http.Request) {
 			h.Helper.ClientError(w, http.StatusBadRequest)
 			return
 		}
+
 		rp.Items = append(rp.Items, models.RecipeItem{
 			Ingredient: models.Component{ID: it.ComponentID},
 			Quantity:   it.Quantity,
@@ -172,21 +171,14 @@ func (h *RecipeHandler) Put(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *RecipeHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	var input struct {
-		ResultID int `json:"result_id"`
-	}
+	id, err := strconv.Atoi(r.URL.Query().Get("id"))
 
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	if id == 0 || err != nil {
 		h.Helper.ClientError(w, http.StatusBadRequest)
 		return
 	}
 
-	if input.ResultID == 0 {
-		h.Helper.ClientError(w, http.StatusBadRequest)
-		return
-	}
-
-	err := h.RecipeService.Delete(input.ResultID)
+	err = h.RecipeService.Delete(id)
 	if err != nil {
 		if sqlerr.Is(err, sql.ErrNoRows) {
 			h.Helper.NotFound(w)

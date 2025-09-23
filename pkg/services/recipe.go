@@ -37,7 +37,7 @@ func (s *RecipeService) ReadByIDs(ids []int) ([]*models.Recipe, error) {
 }
 
 func (s *RecipeService) Create(recipe *models.Recipe) error {
-	// Получаем полные данные об компоненте по полученному ID
+	// Получаем полные данные о компоненте по полученному ID
 	resultComponent, err := s.componentModel.SelectByID(recipe.Result.ID)
 	if err != nil {
 		return err
@@ -67,6 +67,29 @@ func (s *RecipeService) Delete(id int) error {
 	return s.recipeModel.Delete(id)
 }
 
-func (s *RecipeService) Update(r *models.Recipe) error {
-	return s.recipeModel.Update(r)
+func (s *RecipeService) Update(recipe *models.Recipe) error {
+	// Получаем полные данные о компоненте по полученному ID
+	resultComponent, err := s.componentModel.SelectByID(recipe.Result.ID)
+	if err != nil {
+		return err
+	}
+
+	// Собираем все данные об ингридиенте
+	items := []models.RecipeItem{}
+	for _, item := range recipe.Items {
+		ingredient, err := s.componentModel.SelectByID(item.Ingredient.ID)
+		if err != nil {
+			return err
+		}
+
+		items = append(items, models.RecipeItem{
+			Ingredient: *ingredient,
+			Quantity:   item.Quantity,
+		})
+	}
+
+	return s.recipeModel.Update(&models.Recipe{
+		Result: *resultComponent,
+		Items:  items,
+	})
 }

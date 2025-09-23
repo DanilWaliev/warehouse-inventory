@@ -18,9 +18,9 @@ func NewRecipeModel(db *sql.DB) *RecipeModel {
 
 func (m *RecipeModel) SelectByID(id int) (*models.Recipe, error) {
 	// Получаем результирующий компонент
-	stmt := `SELECT c.ID, c.Name, c.Weight, r.Type, c.Note
+	stmt := `SELECT c.Component_ID, c.Name, c.Weight, r.Type, c.Note
 	FROM recipe r
-	JOIN component c ON r.Component_ID = c.ID
+	JOIN component c ON r.Component_ID = c.Component_ID
 	WHERE r.Component_ID = ?;`
 
 	row := m.DB.QueryRow(stmt, id)
@@ -37,9 +37,9 @@ func (m *RecipeModel) SelectByID(id int) (*models.Recipe, error) {
 	}
 
 	// Получаем ингридиенты
-	stmt = `SELECT c.ID, c.Name, c.Weight, c.Type, c.Note, ri.Quantity
+	stmt = `SELECT c.Component_ID, c.Name, c.Weight, c.Type, c.Note, ri.Quantity
 	FROM recipeitem ri
-	JOIN component c ON ri.Component_ID = c.ID
+	JOIN component c ON ri.Component_ID = c.Component_ID
 	WHERE ri.Recipe_Component_ID = ?;`
 
 	rows, err := m.DB.Query(stmt, id)
@@ -52,7 +52,7 @@ func (m *RecipeModel) SelectByID(id int) (*models.Recipe, error) {
 	for rows.Next() {
 		ri := models.RecipeItem{}
 
-		err := rows.Scan(&ri.Ingredient.ID, &ri.Ingredient.Weight, &ri.Ingredient.Type, &ri.Ingredient.Note, &ri.Quantity)
+		err := rows.Scan(&ri.Ingredient.ID, &ri.Ingredient.Name, &ri.Ingredient.Weight, &ri.Ingredient.Type, &ri.Ingredient.Note, &ri.Quantity)
 
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
