@@ -37,3 +37,15 @@ type RecipeItem struct {
 	Ingredient Component
 	Quantity   int
 }
+
+type Order struct {
+	ID        int
+	CreatedAt *time.Time
+	ClosedAt  *time.Time
+	Items     []OrderItem
+}
+
+type OrderItem struct {
+	Recipe   Recipe
+	Quantity int
+}

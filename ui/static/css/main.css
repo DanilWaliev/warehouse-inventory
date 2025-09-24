@@ -10,6 +10,7 @@
 /* Импорт стилей для отдельных страниц */
 @import 'pages/signup.css';
 @import 'pages/signin.css';
+@import 'pages/production.css';
 
 /* Импорт стилей для отдельных компонентов страницы */
 @import 'components/header.css';

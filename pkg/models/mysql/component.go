@@ -123,7 +123,7 @@ func (m *ComponentModel) Insert(name string, weight float64, componentType strin
 }
 
 // Удаляет элемент в таблице по ID
-func (m *ComponentModel) DeleteByID(id int) error {
+func (m *ComponentModel) Delete(id int) error {
 	stmt := `DELETE FROM component
 	WHERE Component_ID = ?`
 

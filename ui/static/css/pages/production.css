@@ -1,0 +1,21 @@
+.status-badge {
+  display: inline-block;
+  padding: var(--spacing-1) var(--spacing-3);
+  border-radius: var(--border-radius-lg);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  min-width: 90px;
+  text-align: center;
+}
+
+.status-created {
+  color: var(--color-warning);
+  border: 1px solid var(--color-warning);
+  background-color: rgba(245,158,11,0.08);
+}
+
+.status-finished {
+  color: var(--color-success);
+  border: 1px solid var(--color-success);
+  background-color: rgba(16,185,129,0.08);
+}

@@ -14,6 +14,7 @@ type APIHandler struct {
 	ComponentHandler *ComponentHandler
 	RecipeHandler    *RecipeHandler
 	UserHandler      *UserHandler
+	OrderHandler     *OrderHandler
 }
 
 func NewAPIHandler(helper *handlers.LogHelper, services *services.Services) *APIHandler {
@@ -22,6 +23,7 @@ func NewAPIHandler(helper *handlers.LogHelper, services *services.Services) *API
 		ComponentHandler: NewComponentHandler(helper, services.ComponentService),
 		RecipeHandler:    NewRecipeHandler(helper, services.RecipeService),
 		UserHandler:      NewUserHandler(helper, services.UserService),
+		OrderHandler:     NewOrderHandler(helper, services.OrderService),
 	}
 }
 
@@ -88,6 +90,26 @@ func (h *APIHandler) Recipe(w http.ResponseWriter, r *http.Request) {
 		}, ", "))
 
 		h.Helper.ClientError(w, http.StatusMethodNotAllowed)
+	}
+}
+
+func (h *APIHandler) Order(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		h.OrderHandler.Get(w, r)
+	case http.MethodPost:
+		h.OrderHandler.Post(w, r)
+	case http.MethodPut:
+		h.OrderHandler.Put(w, r)
+	case http.MethodDelete:
+		h.OrderHandler.Delete(w, r)
+	default:
+		w.Header().Set("Allow", strings.Join([]string{
+			http.MethodPost,
+			http.MethodGet,
+			http.MethodPut,
+			http.MethodDelete,
+		}, ", "))
 	}
 }
 

@@ -17,6 +17,16 @@
     order: document.getElementById('table-order')
   };
 
+  function escapeHtml(str) {
+  if (str === null || str === undefined) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+  }
+
   let active = 'tmc';
 
   // Установка active-tab
@@ -36,7 +46,7 @@
         loadRecipesTable();
         break;
       case "order":
-        //loadAllOrder();
+        loadOrdersTable();
         break;
     }
   }
@@ -348,24 +358,6 @@ async function loadResultTMCSelect() {
   });
 }
 
-// Подгрузка всех ТМЦ в селект ингредиента
-async function loadAllTMCSelect(selectEl) {
-  const res = await fetch("/api/tmc");
-  if (!res.ok) {
-    showToast("Ошибка загрузки ингредиентов");
-    return;
-  }
-  const list = await res.json();
-  selectEl.innerHTML = "";
-
-  list.forEach(tmc => {
-    const option = document.createElement("option");
-    option.value = tmc.ID;
-    option.textContent = tmc.Name;
-    selectEl.appendChild(option);
-  });
-}
-
 // Отправление запроса на создание Рецептуры
 async function createRecipe(e) {
   e.preventDefault();
@@ -554,69 +546,258 @@ async function editRecipe(id) {
           showToast("Ошибка при обновлении рецептуры");
       }
     }
-
-    // вернуть обработчик создания
-    form.onsubmit = createRecipe;
   };
 }
 
-// хелпер для добавления строки ингредиента
-async function addIngredientRow(selectedId = null, quantity = "", container) {
-  // грузим все ТМЦ для селекта
-  const res = await fetch("/api/tmc?type=semi&type=raw");
-  const tmc = await res.json();
+  // хелпер для добавления строки ингредиента
+  async function addIngredientRow(selectedId = null, quantity = "", container) {
+    // грузим все ТМЦ для селекта
+    const res = await fetch("/api/tmc?type=semi&type=raw");
+    const tmc = await res.json();
 
-  const row = document.createElement("div");
-  row.classList.add("ingredient-row", "flex", "gap-2", "mb-2");
+    const row = document.createElement("div");
+    row.classList.add("ingredient-row", "flex", "gap-2", "mb-2");
 
-  const select = document.createElement("select");
-  select.classList.add("ingredient-select", "flex-1");
-  select.name = "ingredient-id"
-  
-  tmc.forEach(opt => {
-    const o = document.createElement("option");
-    o.value = opt.ID;
-    o.textContent = opt.Name;
-    if (opt.ID === selectedId) {
-      o.selected = true;
+    const select = document.createElement("select");
+    select.classList.add("ingredient-select", "flex-1");
+    select.name = "ingredient-id"
+
+    tmc.forEach(opt => {
+      const o = document.createElement("option");
+      o.value = opt.ID;
+      o.textContent = opt.Name;
+      if (opt.ID === selectedId) {
+        o.selected = true;
+      }
+      select.appendChild(o);
+    });
+
+    const input = document.createElement("input");
+    input.type = "number";
+    input.min = "1";
+    input.value = quantity;
+    input.classList.add("ingredient-quantity", "w-24");
+    input.name = "ingredient-qty"
+
+    const delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.textContent = "×";
+    delBtn.classList.add("btn", "btn-danger");
+    delBtn.addEventListener("click", () => row.remove());
+
+    row.appendChild(select);
+    row.appendChild(input);
+    row.appendChild(delBtn);
+
+    container.appendChild(row);
+  }
+
+
+    // Загружаем список возможных "результатов" при открытии модалки рецептуры
+    function openRecipeModal() {
+      loadResultTMCSelect();
+      const container = document.getElementById("ingredients-list")
+      container.innerHTML = ""
+      addIngredientRow(null, 1, container); // чтобы хотя бы одна строка была
     }
-    select.appendChild(o);
-  });
-
-  const input = document.createElement("input");
-  input.type = "number";
-  input.min = "1";
-  input.value = quantity;
-  input.classList.add("ingredient-quantity", "w-24");
-  input.name = "ingredient-qty"
-
-  const delBtn = document.createElement("button");
-  delBtn.type = "button";
-  delBtn.textContent = "×";
-  delBtn.classList.add("btn", "btn-danger");
-  delBtn.addEventListener("click", () => row.remove());
-
-  row.appendChild(select);
-  row.appendChild(input);
-  row.appendChild(delBtn);
-
-  container.appendChild(row);
-}
-
-
-// Загружаем список возможных "результатов" при открытии модалки рецептуры
-function openRecipeModal() {
-  loadResultTMCSelect();
-  const container = document.getElementById("ingredients-list")
-  container.innerHTML = ""
-  addIngredientRow(null, 1, container); // чтобы хотя бы одна строка была
-}
 
 
   // ---------------------------+
   // Скрипты для раздела Заказы |
   // ---------------------------+
-  
+
+  // Загрузка таблицы заказов
+  async function loadOrdersTable() {
+    const tbody = document.getElementById("table-order-body");
+    tbody.innerHTML = "";
+
+    const res = await fetch("/api/order");
+    if (!res.ok) {
+      if (res.status === 404) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td colspan="6" class="text-muted">Нет заказов</td>`;
+        tbody.appendChild(tr);
+      } else {
+        showToast("Ошибка загрузки заказов");
+      }
+      return;
+    }
+
+    const data = await res.json();
+    data.forEach(order => {
+      const tr = document.createElement("tr");
+
+      // список рецептур и их количества
+      const recipesHTML = (order.Items || []).map(it => {
+        return `${escapeHtml(it.Recipe.Result.Name)} × ${escapeHtml(String(it.Quantity))}`;
+      }).join("<br>");
+
+      // статус
+      const statusHtml = order.ClosedAt
+        ? `<span class="status-badge status-finished">Завершен</span>`
+        : `<span class="status-badge status-created">Создан</span>`;
+
+      const openDate = formatDate(order.CreatedAt);
+      const finishDate = formatDate(order.ClosedAt);
+
+      tr.innerHTML = `
+        <td>${escapeHtml(String(order.ID))}</td>
+        <td>${recipesHTML}</td>
+        <td>${statusHtml}</td>
+        <td>${openDate}</td>
+        <td>${finishDate}</td>
+      `;
+
+      // actions
+      const actionsTd = document.createElement("td");
+
+      // кнопка "Готов" только если заказ ещё не завершён
+      if (!order.FinishDate) {
+        const btnReady = document.createElement("button");
+        btnReady.textContent = "Готов";
+        btnReady.className = "btn btn-primary";
+        btnReady.addEventListener("click", async () => {
+          const res = await fetch("/api/order", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: order.ID }),
+          });
+
+          if (res.ok) {
+            showToast("Заказ закрыт", "success");
+            loadOrdersTable();
+          } else {
+            showToast("Ошибка при закрытии заказа");
+          }
+        });
+        actionsTd.appendChild(btnReady);
+      }
+
+      // кнопка "Удалить"
+      const btnDelete = document.createElement("button");
+      btnDelete.textContent = "Удалить";
+      btnDelete.className = "btn-delete";
+      btnDelete.addEventListener("click", () => deleteOrder(order.ID));
+      actionsTd.appendChild(btnDelete);
+
+      tr.appendChild(actionsTd);
+      tbody.appendChild(tr);
+    });
+  }
+
+  // Создание заказа
+  async function createOrder(e) {
+    e.preventDefault();
+
+    const form = e.target;
+    const formData = new FormData(form);
+
+    // Собираем рецептуры и количество
+    const items = [];
+    const rows = document.querySelectorAll("#order-items-list .order-item-row");
+    rows.forEach(row => {
+      const recipeId = row.querySelector("select[name='recipe-id']").value;
+      const qty = row.querySelector("input[name='recipe-qty']").value;
+      if (recipeId && qty > 0) {
+        items.push({
+          recipeId: parseInt(recipeId, 10),
+          quantity: parseInt(qty, 10)
+        });
+      }
+    });
+
+    if (items.length === 0) {
+      showToast("Добавьте хотя бы одну рецептуру");
+      return;
+    }
+
+    const res = await fetch("/api/order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items })
+    });
+
+    if (res.ok) {
+      form.reset();
+      document.getElementById("order-items-list").innerHTML = "";
+      closeModal();
+      loadOrdersTable();
+      showToast("Заказ успешно создан", "success");
+    } else {
+      switch (res.status) {
+        case 401: showToast("Нет доступа"); break;
+        case 400: showToast("Некорректные данные"); break;
+        case 500: showToast("Ошибка на стороне сервера"); break;
+        default:  showToast("Ошибка при создании заказа");
+      }
+    }
+  }
+
+  // Удаление заказа
+  async function deleteOrder(id) {
+    if (!(await showConfirm("Вы действительно хотите удалить заказ?", "Удалить заказ"))) return;
+
+    const res = await fetch(`/api/order?id=${id}`, { method: "DELETE" });
+
+    if (res.ok) {
+      loadOrdersTable();
+      showToast("Заказ удалён", "success");
+    } else {
+      switch (res.status) {
+        case 401: showToast("Нет доступа"); break;
+        case 500: showToast("Ошибка на стороне сервера"); break;
+        default:  showToast("Ошибка при удалении заказа");
+      }
+    }
+  }
+
+  // Хелпер для добавления строки в список рецептур при создании заказа
+  async function addOrderItemRow(selectedId = null, quantity = "", container) {
+    // загружаем рецептуры
+    const res = await fetch("/api/recipe");
+    const recipes = await res.json();
+
+    const row = document.createElement("div");
+    row.classList.add("order-item-row", "flex", "gap-2", "mb-2");
+
+    const select = document.createElement("select");
+    select.classList.add("flex-1");
+    select.name = "recipe-id";
+
+    recipes.forEach(r => {
+      const o = document.createElement("option");
+      o.value = r.Result.ID;
+      o.textContent = r.Result.Name;
+      if (r.Result.ID === selectedId) o.selected = true;
+      select.appendChild(o);
+    });
+
+    const input = document.createElement("input");
+    input.type = "number";
+    input.min = "1";
+    input.value = quantity;
+    input.classList.add("w-24");
+    input.name = "recipe-qty";
+
+    const delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.textContent = "×";
+    delBtn.classList.add("btn", "btn-danger");
+    delBtn.addEventListener("click", () => row.remove());
+
+    row.appendChild(select);
+    row.appendChild(input);
+    row.appendChild(delBtn);
+
+    container.appendChild(row);
+  }
+
+  document.getElementById("add-order-item").addEventListener("click", () => {
+    const container = document.getElementById("order-items-list");
+    addOrderItemRow(null, 1, container);
+  });
+
+
   // Навешивание кликов на меню
   tabs.forEach(li => li.addEventListener('click', e => {
     setActive(li.dataset.tab);
@@ -624,36 +805,59 @@ function openRecipeModal() {
 
   // Модал: открыть и показать форму по active вкладке
   function openModal() {
-    modal.classList.remove('hidden');
-    modal.setAttribute('aria-hidden','false');
-    modalTitle.textContent = active === 'tmc' ? 'Добавить ТМЦ' : active === 'recipe' ? 'Создать рецептуру' : 'Создать заказ';
+      modal.classList.remove('hidden');
+      modal.setAttribute('aria-hidden','false');
+      modalTitle.textContent = active === 'tmc' ? 'Добавить ТМЦ' : active === 'recipe' ? 'Создать рецептуру' : 'Создать заказ';
 
-    // скрываем все формы, показываем только нужную
-    Object.keys(forms).forEach(k => forms[k].classList.toggle('hidden', k !== active));
-    // блокируем скролл страницы
-    document.body.style.overflow = 'hidden';
+      // скрываем все формы, показываем только нужную
+      Object.keys(forms).forEach(k => forms[k].classList.toggle('hidden', k !== active));
+      // блокируем скролл страницы
+      document.body.style.overflow = 'hidden';
 
-    if (active == "recipe") {
-      openRecipeModal()
-    }
+      if (active == "recipe") {
+        openRecipeModal()
+      }
+
+      if (active == "order") {
+        const container = document.getElementById("order-items-list");
+        container.innerHTML = "";
+        addOrderItemRow(null, 1, container); // хотя бы одна строка
+      }
+
   }
 
   forms.tmc.onsubmit = createTMC;
   forms.recipe.onsubmit = createRecipe;
+  forms.order.onsubmit = createOrder;
 
   function closeModal() {
-  modal.classList.add('hidden');
-  modal.setAttribute('aria-hidden','true');
-  document.body.style.overflow = '';
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden','true');
+    document.body.style.overflow = '';
 
-  // Сброс форм (без клонирования)
-  try { forms.tmc.reset(); } catch (e) {}
-  try { forms.recipe.reset(); } catch (e) {}
-  try { forms.order.reset(); } catch (e) {}
+    // Сброс форм (без клонирования)
+    try { forms.tmc.reset(); } catch (e) {}
+    try { forms.recipe.reset(); } catch (e) {}
+    try { forms.order.reset(); } catch (e) {}
 
-  // Гарантированно восстановить стандартный обработчик сабмита
-  forms.tmc.onsubmit = createTMC;
-}
+    // Гарантированно восстановить стандартный обработчик сабмита
+    forms.tmc.onsubmit = createTMC;
+    forms.recipe.onsubmit = createRecipe;
+    forms.order.onsubmit = createOrder;
+
+  }
+
+  // функция для форматирования даты
+  function formatDate(dateStr) {
+    if (!dateStr) return "-"; // если null или пустая
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("ru-RU", { 
+      year: "numeric", month: "2-digit", day: "2-digit" 
+    }) + " " + d.toLocaleTimeString("ru-RU", {
+      hour: "2-digit", minute: "2-digit"
+    });
+  }
+
 
 
   addBtn.addEventListener('click', openModal);
