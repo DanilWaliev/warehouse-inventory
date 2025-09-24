@@ -67,5 +67,5 @@ func (s *ComponentService) Update(id int, name string, weight float64, component
 
 // Удаляет компонент с указанным ID
 func (s *ComponentService) Delete(id int) error {
-	return s.componentModel.DeleteByID(id)
+	return s.componentModel.Delete(id)
 }
