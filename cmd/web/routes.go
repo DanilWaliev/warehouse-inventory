@@ -10,7 +10,9 @@ func (app *application) routes() *http.ServeMux {
 	mux.HandleFunc("/signup", app.authHandler.SignUp)
 	mux.HandleFunc("/signout", app.authHandler.SignOut)
 
+	// Страницы
 	mux.HandleFunc("/production", app.authHandler.AccessWithRoles(app.pageHandler.Production, "admin", "productionmanager"))
+	mux.HandleFunc("/movement", app.authHandler.AccessWithRoles(app.pageHandler.Movement, "admin", "logistics"))
 
 	// Запросы к API
 	mux.HandleFunc("/api/tmc", app.authHandler.AccessWithRoles(app.apiHandler.Component, "admin", "productionmanager"))

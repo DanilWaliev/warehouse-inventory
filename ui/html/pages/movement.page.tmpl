@@ -1,0 +1,311 @@
+{{template "base" .}}
+
+{{/* Каждый блок - карточка .card */}}
+{{/* Данные для шаблона: .TMC, .Products, .Recipes, .Orders */}}
+
+{{define "title"}}Перемещение{{end}}
+
+{{define "main"}}
+<!-- Content -->
+<section class="content">
+
+  <!-- Topbar: заголовок и глобальная кнопка "Добавить" с выпадающим выбором -->
+  <div class="topbar flex justify-between items-center">
+    <h2 id="section-title">Логистика — перемещения и партнёры</h2>
+
+    <div class="flex items-center gap-2">
+      <!-- Выпадающее меню создания сущности -->
+      <div class="create-dropdown">
+        <button class="btn btn-primary" id="createBtn">Добавить</button>
+        <div class="dropdown hidden" id="createDropdown">
+          <button class="dropdown-item" data-open-modal="move-create">Создать заказ перемещения</button>
+          <button class="dropdown-item" data-open-modal="route-create">Создать маршрут</button>
+          <button class="dropdown-item" data-open-modal="transit-create">Создать транзитный склад</button>
+          <button class="dropdown-item" data-open-modal="partner-create">Создать поставщика/покупателя</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Главный грид: слева таблицы заказов (больше места), справа справочники -->
+  <div class="grid" style="display:grid;grid-template-columns:2fr 1fr;gap:1rem;margin-top:1rem;">
+
+    <!-- LEFT: Заказы перемещения -->
+    <div>
+      <div class="card">
+        <h3 class="mb-2">Заказы перемещения</h3>
+
+        <div class="table-wrap">
+          <table class="table" id="table-move">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Маршрут</th>
+                <th>Содержимое</th>
+                <th>Статус</th>
+                <th>Создан</th>
+                <th>Завершён</th>
+                <th>Действия</th>
+              </tr>
+            </thead>
+            <tbody>
+              {{- if .Moves }}
+                {{- range .Moves }}
+                  <tr data-id="{{ .ID }}">
+                    <td>#{{ .ID }}</td>
+                    <td>
+                      {{ if .Route }}
+                        {{ .Route.Name }}
+                      {{ else }}
+                        —
+                      {{ end }}
+                    </td>
+
+                    <td>
+                      {{- if .Items }}
+                        <ul class="text-muted" style="list-style:none;padding-left:0;margin:0;">
+                          {{- range .Items }}
+                            <li>{{ .Recipe.Result.Name }} × {{ .Quantity }}</li>
+                          {{- end }}
+                        </ul>
+                      {{- else }}
+                        —
+                      {{- end }}
+                    </td>
+
+                    <td>
+                      {{- if .ClosedAt }}
+                        <span class="status-badge status-finished">Завершён</span>
+                      {{- else if .DispatchSignedAt }}
+                        <span class="status-badge status-dispatched">Отправлен</span>
+                      {{- else }}
+                        <span class="status-badge status-created">Создан</span>
+                      {{- end }}
+                    </td>
+
+                    <td>{{ if .CreatedAt }}{{ .CreatedAt }}{{ else }}-{{ end }}</td>
+                    <td>{{ if .ClosedAt }}{{ .ClosedAt }}{{ else }}-{{ end }}</td>
+
+                    <td>
+                      <!-- Ссылка на просмотр/печатную версию заказа -->
+                      <a class="btn" href="/move/{{ .ID }}">Открыть</a>
+
+                      <!-- Подписать отправление (если ещё не подписано) -->
+                      {{- if not .DispatchSignedAt }}
+                        <form method="post" action="/move/sign/dispatch" style="display:inline">
+                          <input type="hidden" name="id" value="{{ .ID }}">
+                          <button type="submit" class="btn btn-primary">Подписать отправление</button>
+                        </form>
+                      {{- end }}
+
+                      <!-- Подписать получение (если отправление подписано и получение ещё не) -->
+                      {{- if and .DispatchSignedAt (not .ClosedAt) }}
+                        <form method="post" action="/move/sign/receive" style="display:inline">
+                          <input type="hidden" name="id" value="{{ .ID }}">
+                          <button type="submit" class="btn btn-primary">Подписать получение</button>
+                        </form>
+                      {{- end }}
+
+                      <!-- Удалить заказ (если он ещё не завершён) -->
+                      <form method="post" action="/move/delete" style="display:inline">
+                        <input type="hidden" name="id" value="{{ .ID }}">
+                        <button type="submit" class="btn btn-danger">Удалить</button>
+                      </form>
+                    </td>
+                  </tr>
+                {{- end }}
+              {{- else }}
+                <tr><td colspan="7" class="text-muted">Нет заказов</td></tr>
+              {{- end }}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: справочники (маршруты, транзитные склады, партнёры) -->
+    <div>
+      <!-- Маршруты -->
+      <div class="card mb-4">
+        <h4>Маршруты</h4>
+        <div class="table-wrap">
+          <table class="table" id="table-routes">
+            <thead>
+              <tr><th>Название</th><th>Откуда → Куда</th><th>Транзит</th><th>Действия</th></tr>
+            </thead>
+            <tbody>
+              {{- if .Routes }}
+                {{- range .Routes }}
+                  <tr data-id="{{ .ID }}">
+                    <td>{{ .Name }}</td>
+                    <td>{{ .FromName }} → {{ .ToName }}</td>
+                    <td>{{ if .Transit }}{{ .Transit.Name }}{{ else }}—{{ end }}</td>
+                    <td>
+                      <form method="post" action="/route/delete" style="display:inline">
+                        <input type="hidden" name="id" value="{{ .ID }}">
+                        <button type="submit" class="btn btn-danger">Удалить</button>
+                      </form>
+                    </td>
+                  </tr>
+                {{- end }}
+              {{- else }}
+                <tr><td colspan="4" class="text-muted">Нет маршрутов</td></tr>
+              {{- end }}
+            </tbody>
+          </table>
+          <div class="mt-2">
+            <button class="btn" data-open-modal="route-create">Создать маршрут</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Транзитные склады -->
+      <div class="card mb-4">
+        <h4>Транзитные склады</h4>
+        <div class="table-wrap">
+          <table class="table" id="table-transits">
+            <thead><tr><th>Название</th><th>Адрес / Примечание</th><th>Действия</th></tr></thead>
+            <tbody>
+              {{- if .Transits }}
+                {{- range .Transits }}
+                  <tr data-id="{{ .ID }}">
+                    <td>{{ .Name }}</td>
+                    <td>{{ .Note }}</td>
+                    <td>
+                      <form method="post" action="/transit/delete" style="display:inline">
+                        <input type="hidden" name="id" value="{{ .ID }}">
+                        <button type="submit" class="btn btn-danger">Удалить</button>
+                      </form>
+                    </td>
+                  </tr>
+                {{- end }}
+              {{- else }}
+                <tr><td colspan="3" class="text-muted">Нет транзитных складов</td></tr>
+              {{- end }}
+            </tbody>
+          </table>
+          <div class="mt-2"><button class="btn" data-open-modal="transit-create">Создать транзитный склад</button></div>
+        </div>
+      </div>
+
+      <!-- Поставщики и покупатели -->
+      <div class="card">
+        <h4>Поставщики / Покупатели</h4>
+        <div class="table-wrap">
+          <table class="table" id="table-partners">
+            <thead><tr><th>Тип</th><th>Наименование</th><th>Контакты</th><th>Действия</th></tr></thead>
+            <tbody>
+              {{- if .Partners }}
+                {{- range .Partners }}
+                  <tr data-id="{{ .ID }}">
+                    <td>{{ .Type }}</td>
+                    <td>{{ .Name }}</td>
+                    <td>{{ .Contact }}</td>
+                    <td>
+                      <form method="post" action="/partner/delete" style="display:inline">
+                        <input type="hidden" name="id" value="{{ .ID }}">
+                        <button type="submit" class="btn btn-danger">Удалить</button>
+                      </form>
+                    </td>
+                  </tr>
+                {{- end }}
+              {{- else }}
+                <tr><td colspan="4" class="text-muted">Нет партнёров</td></tr>
+              {{- end }}
+            </tbody>
+          </table>
+          <div class="mt-2"><button class="btn" data-open-modal="partner-create">Создать партнёра</button></div>
+        </div>
+      </div>
+
+    </div> <!-- end right column -->
+  </div> <!-- end grid -->
+
+  <!-- МОДАЛЫ -->
+
+  <!-- Создать заказ перемещения -->
+  <div id="modal-move-create" class="modal hidden" aria-hidden="true">
+    <div class="modal-content">
+      <h3>Создать заказ перемещения</h3>
+      <form method="post" action="/move/create">
+        <div class="mb-4">
+          <label>Маршрут</label>
+          <select name="route_id" required>
+            <option value="">— Выберите маршрут —</option>
+            {{- range .Routes }}
+              <option value="{{ .ID }}">{{ .Name }} — {{ .FromName }} → {{ .ToName }}</option>
+            {{- end }}
+          </select>
+        </div>
+
+        <div class="mb-4">
+          <label>Элементы (рецептура и количество)</label>
+          <div id="move-items-list">
+            <div class="move-item-row">
+              <select name="recipe_id">
+                <option value="">— Выберите рецептуру —</option>
+                {{- range .Recipes }}
+                  <option value="{{ .Result.ID }}">{{ .Result.Name }}</option>
+                {{- end }}
+              </select>
+              <input type="number" name="quantity" min="1" value="1">
+            </div>
+          </div>
+          <div class="mt-2"><button type="button" class="btn" data-action="add-move-item">+ Добавить позицию</button></div>
+        </div>
+
+        <div class="flex justify-end gap-2">
+          <button type="button" class="btn" data-close-modal>Отмена</button>
+          <button type="submit" class="btn btn-primary">Создать</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Создать маршрут -->
+  <div id="modal-route-create" class="modal hidden" aria-hidden="true">
+    <div class="modal-content">
+      <h3>Создать маршрут</h3>
+      <form method="post" action="/route/create">
+        <div class="mb-4"><label>Название</label><input name="name" required></div>
+        <div class="mb-4"><label>Откуда (склад)</label><select name="from_id">{{ range .Warehouses }}<option value="{{ .ID }}">{{ .Name }}</option>{{ end }}</select></div>
+        <div class="mb-4"><label>Куда (склад)</label><select name="to_id">{{ range .Warehouses }}<option value="{{ .ID }}">{{ .Name }}</option>{{ end }}</select></div>
+        <div class="mb-4"><label>Транзит (опционально)</label><select name="transit_id"><option value="">— нет —</option>{{ range .Transits }}<option value="{{ .ID }}">{{ .Name }}</option>{{ end }}</select></div>
+        <div class="flex justify-end gap-2"><button type="button" class="btn" data-close-modal>Отмена</button><button type="submit" class="btn btn-primary">Создать</button></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Создать транзитный склад -->
+  <div id="modal-transit-create" class="modal hidden" aria-hidden="true">
+    <div class="modal-content">
+      <h3>Создать транзитный склад</h3>
+      <form method="post" action="/transit/create">
+        <div class="mb-4"><label>Название</label><input name="name" required></div>
+        <div class="mb-4"><label>Примечание / адрес</label><input name="note"></div>
+        <div class="flex justify-end gap-2"><button type="button" class="btn" data-close-modal>Отмена</button><button type="submit" class="btn btn-primary">Создать</button></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Создать партнёра (поставщик / покупатель) -->
+  <div id="modal-partner-create" class="modal hidden" aria-hidden="true">
+    <div class="modal-content">
+      <h3>Создать поставщика / покупателя</h3>
+      <form method="post" action="/partner/create">
+        <div class="mb-4">
+          <label>Тип</label>
+          <select name="type">
+            <option value="supplier">Поставщик</option>
+            <option value="customer">Покупатель</option>
+          </select>
+        </div>
+        <div class="mb-4"><label>Наименование</label><input name="name" required></div>
+        <div class="mb-4"><label>Контакт</label><input name="contact"></div>
+        <div class="flex justify-end gap-2"><button type="button" class="btn" data-close-modal>Отмена</button><button type="submit" class="btn btn-primary">Создать</button></div>
+      </form>
+    </div>
+  </div>
+
+</section>
+{{end}}
