@@ -30,3 +30,8 @@
   border-radius: var(--border-radius);
   border: none;
 }
+
+/* Отступ между кнопками */
+td button {
+  margin-right: var(--spacing-2);
+}

@@ -652,10 +652,10 @@ async function editRecipe(id) {
       const actionsTd = document.createElement("td");
 
       // кнопка "Готов" только если заказ ещё не завершён
-      if (!order.FinishDate) {
+      if (!order.ClosedAt) {
         const btnReady = document.createElement("button");
         btnReady.textContent = "Готов";
-        btnReady.className = "btn btn-primary";
+        btnReady.className = "btn-edit";
         btnReady.addEventListener("click", async () => {
           const res = await fetch("/api/order", {
             method: "PUT",
@@ -847,16 +847,22 @@ async function editRecipe(id) {
 
   }
 
-  // функция для форматирования даты
   function formatDate(dateStr) {
     if (!dateStr) return "-"; // если null или пустая
+  
     const d = new Date(dateStr);
-    return d.toLocaleDateString("ru-RU", { 
-      year: "numeric", month: "2-digit", day: "2-digit" 
-    }) + " " + d.toLocaleTimeString("ru-RU", {
-      hour: "2-digit", minute: "2-digit"
-    });
+  
+    // Опции для форматирования с таймзоной Europe/Moscow
+    const options = { 
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit",
+      timeZone: "Europe/Moscow",
+      hour12: false
+    };
+  
+    return d.toLocaleString("ru-RU", options) + " МСК";
   }
+
 
 
 
