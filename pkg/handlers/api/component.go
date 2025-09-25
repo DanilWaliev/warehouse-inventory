@@ -164,6 +164,7 @@ func (h *ComponentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	err = h.ComponentService.Delete(id)
 	if err != nil {
 		h.Helper.ServerError(w, err)
+		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
