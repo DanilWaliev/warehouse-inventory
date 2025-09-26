@@ -77,10 +77,10 @@ func (h *ComponentHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *ComponentHandler) Post(w http.ResponseWriter, r *http.Request) {
 	// Структура для получения данных из запроса (используются структурные теги)
 	var newTMC struct {
-		Name    string `json:"name"`
-		Weight  string `json:"weight"`
-		TMCtype string `json:"type"`
-		Note    string `json:"note"`
+		Name    string  `json:"name"`
+		Weight  float64 `json:"weight"`
+		TMCtype string  `json:"type"`
+		Note    string  `json:"note"`
 	}
 
 	// Декодируем полученный JSON в созданную структуру
@@ -90,15 +90,8 @@ func (h *ComponentHandler) Post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Приводим строку к числу с плаващей точкой (вес компонента, ТМЦ)
-	weight, err := strconv.ParseFloat(newTMC.Weight, 64)
-	if err != nil {
-		h.Helper.ClientError(w, http.StatusBadRequest)
-		return
-	}
-
 	// Вставляем данные в таблицу
-	err = h.ComponentService.Create(newTMC.Name, weight, newTMC.TMCtype, newTMC.Note)
+	err = h.ComponentService.Create(newTMC.Name, newTMC.Weight, newTMC.TMCtype, newTMC.Note)
 	if err != nil {
 		if sqlerr.Is(err, sqlerr.ErrDuplicateEntry) {
 			h.Helper.ClientError(w, http.StatusConflict)
@@ -116,11 +109,11 @@ func (h *ComponentHandler) Post(w http.ResponseWriter, r *http.Request) {
 func (h *ComponentHandler) Put(w http.ResponseWriter, r *http.Request) {
 	// Структура для получения данных из запроса (используются структурные теги)
 	var newTMC struct {
-		ID      int    `json:"id"`
-		Name    string `json:"name"`
-		Weight  string `json:"weight"`
-		TMCtype string `json:"type"`
-		Note    string `json:"note"`
+		ID      int     `json:"id"`
+		Name    string  `json:"name"`
+		Weight  float64 `json:"weight"`
+		TMCtype string  `json:"type"`
+		Note    string  `json:"note"`
 	}
 
 	// Декодируем полученный JSON в созданную структуру
@@ -130,15 +123,8 @@ func (h *ComponentHandler) Put(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Приводим строку к числу с плаващей точкой (вес компонента, ТМЦ)
-	weight, err := strconv.ParseFloat(newTMC.Weight, 64)
-	if err != nil {
-		h.Helper.ServerError(w, err)
-		return
-	}
-
 	// Обновляем данные в таблице
-	err = h.ComponentService.Update(newTMC.ID, newTMC.Name, weight, newTMC.TMCtype, newTMC.Note)
+	err = h.ComponentService.Update(newTMC.ID, newTMC.Name, newTMC.Weight, newTMC.TMCtype, newTMC.Note)
 	if err != nil {
 		if sqlerr.Is(err, sqlerr.ErrDuplicateEntry) {
 			h.Helper.ClientError(w, http.StatusConflict)

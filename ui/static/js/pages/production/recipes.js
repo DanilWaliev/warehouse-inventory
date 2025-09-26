@@ -10,10 +10,10 @@ export async function initRecipes({ showToast, showConfirm, modal }) {
 
   if (!tbody || !form || !ingredientsContainer || !resultSelect) {
     console.warn("recipes.js: отсутствуют элементы формы/таблицы рецептов");
-    return { load: () => {}, reset: () => {}, openModal: () => {} };
+    return { load: () => {}, reset: () => {}, openModal: () => {}, openEdit: () => {} };
   }
 
-  async function loadRecipesTable() {
+  async function load() {
     tbody.innerHTML = "";
     const res = await fetch("/api/recipe");
     if (!res.ok) {
@@ -26,6 +26,7 @@ export async function initRecipes({ showToast, showConfirm, modal }) {
       }
       return;
     }
+
     const data = await res.json();
     data.forEach(recipe => {
       let resultType = recipe.Result.Type;
@@ -34,6 +35,7 @@ export async function initRecipes({ showToast, showConfirm, modal }) {
         case "semi": resultType = "Полуфабрикат"; break;
         case "product": resultType = "Продукт"; break;
       }
+
       const ingredientsHTML = recipe.Items.map(item => {
         let t = item.Ingredient.Type;
         switch (t) {
@@ -50,12 +52,14 @@ export async function initRecipes({ showToast, showConfirm, modal }) {
         <td>${escapeHtml(resultType)}</td>
         <td>${ingredientsHTML}</td>
         <td>
-          <button class="btn-delete">Удалить</button>
-          <button class="btn-edit">Изменить</button>
+          <button class="btn-delete" data-id="${recipe.Result.ID}">Удалить</button>
+          <button class="btn-edit" data-id="${recipe.Result.ID}">Изменить</button>
         </td>
       `;
+
       tr.querySelector(".btn-delete").addEventListener("click", () => deleteRecipe(recipe.Result.ID));
-      tr.querySelector(".btn-edit").addEventListener("click", () => editRecipe(recipe.Result.ID));
+      tr.querySelector(".btn-edit").addEventListener("click", () => openEdit(recipe.Result.ID));
+
       tbody.appendChild(tr);
     });
   }
@@ -76,7 +80,7 @@ export async function initRecipes({ showToast, showConfirm, modal }) {
     });
   }
 
-  async function addIngredientRow(selectedId = null, quantity = "", container = ingredientsContainer) {
+  async function addIngredientRow(selectedId = null, quantity = 1, container = ingredientsContainer) {
     const res = await fetch("/api/tmc?type=semi&type=raw");
     if (!res.ok) {
       showToast("Ошибка загрузки ингредиентов");
@@ -118,21 +122,16 @@ export async function initRecipes({ showToast, showConfirm, modal }) {
     container.appendChild(row);
   }
 
-  async function createRecipe(e) {
-    e.preventDefault();
+  async function createRecipe(ev) {
+    ev.preventDefault();
     const fd = new FormData(form);
     const resultId = fd.get("result-tmc-id") || fd.get("result-tmc");
     const rows = document.querySelectorAll("#ingredients-list .ingredient-row");
     const items = [];
     rows.forEach(row => {
-      const compIdEl = row.querySelector("select[name='ingredient-id']");
-      const qtyEl = row.querySelector("input[name='ingredient-qty']");
-      if (!compIdEl || !qtyEl) return;
-      const compId = compIdEl.value;
-      const qty = qtyEl.value;
-      if (compId && Number(qty) > 0) {
-        items.push({ componentId: Number(compId), quantity: Number(qty) });
-      }
+      const compId = row.querySelector("select[name='ingredient-id']").value;
+      const qty = row.querySelector("input[name='ingredient-qty']").value;
+      if (compId && Number(qty) > 0) items.push({ componentId: Number(compId), quantity: Number(qty) });
     });
 
     if (!resultId) { showToast("Выберите результат"); return; }
@@ -145,11 +144,10 @@ export async function initRecipes({ showToast, showConfirm, modal }) {
     });
 
     if (res.ok) {
-      form.reset();
-      ingredientsContainer.innerHTML = "";
-      modal.classList.add('hidden');
-      modal.setAttribute('aria-hidden','true');
-      loadRecipesTable();
+      reset();
+      modal.classList.add("hidden");
+      modal.setAttribute("aria-hidden", "true");
+      await load();
       showToast("Рецептура создана", "success");
     } else {
       showToast("Ошибка при создании рецептуры");
@@ -160,25 +158,24 @@ export async function initRecipes({ showToast, showConfirm, modal }) {
     if (!(await showConfirm("Вы уверены, что хотите удалить рецептуру?"))) return;
     const res = await fetch(`/api/recipe?id=${id}`, { method: "DELETE" });
     if (res.ok) {
-      loadRecipesTable();
+      await load();
       showToast("Рецептура удалена", "success");
     } else {
       showToast("Ошибка при удалении рецептуры");
     }
   }
 
-  async function editRecipe(id) {
+  async function openEdit(id) {
     const res = await fetch(`/api/recipe?id=${id}`);
     if (!res.ok) { showToast("Ошибка загрузки рецептуры"); return; }
-    let recipe = await res.json();
-    recipe = recipe[0];
+    let data = await res.json();
+    const recipe = Array.isArray(data) ? data[0] : data;
 
-    modal.classList.remove('hidden');
-    modal.setAttribute('aria-hidden','false');
+    // показать форму и подготовить её
+    document.querySelectorAll(".modal-form").forEach(f => f.classList.add("hidden"));
+    form.classList.remove("hidden");
 
-    // загружаем варианты для результата
     await loadResultTMCSelect();
-    // выбранный результат
     resultSelect.value = recipe.Result.ID;
 
     ingredientsContainer.innerHTML = "";
@@ -186,50 +183,69 @@ export async function initRecipes({ showToast, showConfirm, modal }) {
       await addIngredientRow(it.Ingredient.ID, it.Quantity, ingredientsContainer);
     }
 
-    // временное onsubmit
-    form.onsubmit = async function (e) {
-      e.preventDefault();
+    form.dataset.mode = "edit";
+    form.dataset.id = String(id);
+
+    modal.classList.remove("hidden");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+
+    // временно подменяем onsubmit
+    form.onsubmit = async function (ev) {
+      ev.preventDefault();
       const rows = document.querySelectorAll("#ingredients-list .ingredient-row");
       const items = [];
       rows.forEach(row => {
         const compId = row.querySelector("select[name='ingredient-id']").value;
         const qty = row.querySelector("input[name='ingredient-qty']").value;
-        if (compId && qty > 0) items.push({ componentId: Number(compId), quantity: Number(qty) });
+        if (compId && Number(qty) > 0) items.push({ componentId: Number(compId), quantity: Number(qty) });
       });
       if (items.length === 0) { showToast("Добавьте ингредиенты"); return; }
+
       const updRes = await fetch("/api/recipe", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ resultId: id, items })
       });
+
       if (updRes.ok) {
-        form.reset();
-        modal.classList.add('hidden');
-        modal.setAttribute('aria-hidden','true');
-        loadRecipesTable();
+        reset();
+        modal.classList.add("hidden");
+        modal.setAttribute("aria-hidden", "true");
+        await load();
         showToast("Рецептура обновлена", "success");
       } else {
         showToast("Ошибка при обновлении рецептуры");
       }
+
+      // вернуть onsubmit по умолчанию
       form.onsubmit = createRecipe;
     };
   }
 
   // привязки
   form.onsubmit = createRecipe;
-  addIngredientBtn.addEventListener('click', () => addIngredientRow(null, 1));
+  addIngredientBtn.addEventListener("click", () => addIngredientRow(null, 1));
 
   function reset() {
     try { form.reset(); } catch (e) {}
     ingredientsContainer.innerHTML = "";
+    form.dataset.mode = "create";
+    delete form.dataset.id;
     form.onsubmit = createRecipe;
   }
 
   function openModal() {
+    // показать форму создания
+    document.querySelectorAll(".modal-form").forEach(f => f.classList.add("hidden"));
+    form.classList.remove("hidden");
     loadResultTMCSelect();
     ingredientsContainer.innerHTML = "";
     addIngredientRow(null, 1);
+    modal.classList.remove("hidden");
+    modal.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
   }
 
-  return { load: loadRecipesTable, reset, openModal };
+  return { load, reset, openModal, openEdit };
 }

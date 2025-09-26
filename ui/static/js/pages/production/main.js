@@ -14,7 +14,7 @@ import { initOrders } from "./orders.js";
   const addBtn = document.getElementById('addBtn');
   const modal = document.getElementById('modal');
 
-  // формы внутри модалки (мы управляем видимостью тут)
+  // формы внутри модалки
   const forms = {
     tmc: document.getElementById('form-tmc'),
     recipe: document.getElementById('form-recipe'),
@@ -55,7 +55,7 @@ import { initOrders } from "./orders.js";
     tabs.forEach(li => li.classList.toggle('active', li.dataset.tab === tab));
     sectionTitle.textContent = tab === 'tmc' ? 'ТМЦ' : tab === 'recipe' ? 'Рецептуры' : 'Заказы';
 
-    // показываем/скрываем таблицы (в шаблоне должны быть таблицы с этими id)
+    // показываем/скрываем таблицы
     const tables = {
       tmc: document.getElementById('table-tmc'),
       recipe: document.getElementById('table-recipe'),
@@ -83,7 +83,7 @@ import { initOrders } from "./orders.js";
     // показываем только форму текущей вкладки
     showModalForm(active);
 
-    // даём модулям подготовить данные (например заполнить селекты)
+    // даём модулям подготовить данные (заполнить селекты)
     if (active === 'tmc' && tmcModule && tmcModule.openModal) tmcModule.openModal();
     if (active === 'recipe' && recipesModule && recipesModule.openModal) recipesModule.openModal();
     if (active === 'order' && ordersModule && ordersModule.openModal) ordersModule.openModal();

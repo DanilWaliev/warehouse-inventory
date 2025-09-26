@@ -100,7 +100,7 @@
       <h3 id="modal-title" class="mb-4">Добавить</h3>
 
       <!-- Форма: ТМЦ -->
-      <form id="form-tmc" class="modal-form">
+      <form id="form-tmc" class="modal-form" data-mode="create" data-id="">
         <div class="mb-4">
           <input name="name" type="text" required class="w-full" placeholder="Название">
         </div>
@@ -129,7 +129,7 @@
       </form>
 
       <!-- Форма: Рецептура -->
-      <form id="form-recipe" class="modal-form">
+      <form id="form-recipe" class="modal-form" data-mode="create" data-id="">
         <div class="mb-4">
           <label>Результат</label>
           <select name="result-tmc-id" id="result-tmc" class="w-full"></select>
@@ -153,7 +153,7 @@
       </form>
 
       <!-- Форма: Заказ -->
-      <form id="form-order" class="modal-form hidden">
+      <form id="form-order" class="modal-form hidden" data-mode="create" data-id="">
         <div class="mb-4">
           <p><label>Рецептуры</label></p>
           <div id="order-items-list"></div>
