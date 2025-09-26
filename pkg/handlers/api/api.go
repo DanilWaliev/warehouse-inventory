@@ -15,6 +15,7 @@ type APIHandler struct {
 	RecipeHandler    *RecipeHandler
 	UserHandler      *UserHandler
 	OrderHandler     *OrderHandler
+	StorageHandler   *StorageHandler
 }
 
 func NewAPIHandler(helper *handlers.LogHelper, services *services.Services) *APIHandler {
@@ -24,6 +25,7 @@ func NewAPIHandler(helper *handlers.LogHelper, services *services.Services) *API
 		RecipeHandler:    NewRecipeHandler(helper, services.RecipeService),
 		UserHandler:      NewUserHandler(helper, services.UserService),
 		OrderHandler:     NewOrderHandler(helper, services.OrderService),
+		StorageHandler:   NewStorageHandler(helper, services.StorageService),
 	}
 }
 

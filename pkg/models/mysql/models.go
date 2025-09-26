@@ -10,6 +10,7 @@ type MySQLModels struct {
 	ComponentModel *ComponentModel
 	RecipeModel    *RecipeModel
 	OrderModel     *OrderModel
+	StorageModel   *StorageModel
 }
 
 // Конструктор
@@ -19,5 +20,6 @@ func NewMySQLModels(db *sql.DB) *MySQLModels {
 		ComponentModel: NewComponentModel(db),
 		RecipeModel:    NewRecipeModel(db),
 		OrderModel:     NewOrderModel(db),
+		StorageModel:   NewStorageModel(db),
 	}
 }

@@ -49,3 +49,14 @@ type OrderItem struct {
 	Recipe   Recipe
 	Quantity int
 }
+
+type Warehouse struct {
+	ID        int
+	Note      string
+	Inventory []WarehouseItem
+}
+
+type WarehouseItem struct {
+	Component Component
+	Quantity  int
+}

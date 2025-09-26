@@ -33,3 +33,7 @@ func (h *PageHandler) Production(w http.ResponseWriter, r *http.Request) {
 func (h *PageHandler) Movement(w http.ResponseWriter, r *http.Request) {
 	h.Renderer.Render(w, "movement.page.tmpl", nil)
 }
+
+func (h *PageHandler) Inventory(w http.ResponseWriter, r *http.Request) {
+	h.Renderer.Render(w, "inventory.page.tmpl", nil)
+}

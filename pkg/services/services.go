@@ -7,6 +7,7 @@ type Services struct {
 	ComponentService *ComponentService
 	RecipeService    *RecipeService
 	OrderService     *OrderService
+	StorageService   *StorageService
 }
 
 func NewServices(models *mysql.MySQLModels) *Services {
@@ -15,5 +16,6 @@ func NewServices(models *mysql.MySQLModels) *Services {
 		ComponentService: NewComponentService(models.ComponentModel),
 		RecipeService:    NewRecipeService(models.RecipeModel, models.ComponentModel),
 		OrderService:     NewOrderService(models.OrderModel, models.RecipeModel),
+		StorageService:   NewStorageService(models.StorageModel),
 	}
 }
