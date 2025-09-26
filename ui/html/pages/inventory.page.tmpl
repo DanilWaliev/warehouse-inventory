@@ -1,0 +1,207 @@
+{{template "base" .}}
+
+{{define "title"}}Инвентаризация{{end}}
+
+{{ define "main" }}
+<main>
+
+  <!-- Обёртка под хедером: слева меню, справа контент -->
+  <div class="page" id="page-root">
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <ul>
+        <li class="active" data-tab="tmc">ТМЦ</li>
+        <li data-tab="stock-warehouse">Запасы на складах</li>
+        <li data-tab="stock-transit">Запасы в пути</li>
+        <li data-tab="stock-production">Запасы в производстве</li>
+      </ul>
+    </aside>
+
+    <!-- Content -->
+    <section class="content">
+
+      <!-- Верхняя панель -->
+      <div class="topbar">
+        <h2 id="section-title">ТМЦ</h2>
+        <div>
+          <button class="btn btn-primary" id="addBtn">Добавить</button>
+        </div>
+      </div>
+
+      <!-- Карточка со списком таблиц -->
+      <div class="card item-list">
+        <div class="table-wrap">
+
+          <!-- ТМЦ -->
+          <table class="table tab-table" id="table-tmc">
+            <thead>
+              <tr>
+                <th>Код</th>
+                <th>Название</th>
+                <th>Вес (кг)</th>
+                <th>Тип</th>
+                <th>Заметка</th>
+                <th>Действия</th>
+              </tr>
+            </thead>
+            <tbody id="table-tmc-body">
+              
+            </tbody>
+          </table>
+
+          <!-- Запасы на складах -->
+          <table class="table tab-table hidden" id="table-stock-warehouse">
+            <thead>
+              <tr>
+                <th>Склад</th>
+                <th>ТМЦ</th>
+                <th>Количество</th>
+                <th>Вес (кг)</th>
+                <th>Действия</th>
+              </tr>
+            </thead>
+            <tbody id="table-stock-warehouse-body">
+              
+            </tbody>
+          </table>
+
+          <!-- Запасы в пути -->
+          <table class="table tab-table hidden" id="table-stock-transit">
+            <thead>
+              <tr>
+                <th>№ Документа</th>
+                <th>ТМЦ</th>
+                <th>Количество</th>
+                <th>Маршрут</th>
+                <th>Статус</th>
+              </tr>
+            </thead>
+            <tbody id="table-stock-transit-body">
+              
+            </tbody>
+          </table>
+
+          <!-- Запасы в производстве -->
+          <table class="table tab-table hidden" id="table-stock-production">
+            <thead>
+              <tr>
+                <th>ТМЦ</th>
+                <th>Количество</th>
+                <th>Вес (кг)</th>
+                <th>Заказ</th>
+                <th>Действия</th>
+              </tr>
+            </thead>
+            <tbody id="table-stock-production-body">
+              
+            </tbody>
+          </table>
+
+        </div>
+      </div>
+
+    </section>
+  </div>
+
+  <!-- Модальное окно -->
+  <div id="modal" class="modal hidden" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="modal-content" role="document">
+      <h3 id="modal-title" class="mb-4">Добавить</h3>
+
+      <!-- Форма: ТМЦ -->
+      <form id="form-tmc" class="modal-form" data-mode="create" data-id="">
+        <div class="mb-4">
+          <input name="name" type="text" required class="w-full" placeholder="Название">
+        </div>
+
+        <div class="mb-4">
+          <input name="weight" type="number" step="0.01" required class="w-full" placeholder="Вес (кг)">
+        </div>
+
+        <div class="mb-4">
+          <select name="type" class="w-full">
+            <option value="raw">Сырье</option>
+            <option value="semi">Полуфабрикат</option>
+            <option value="product">Продукт</option>
+          </select>
+        </div>
+
+        <div class="mb-4">
+          <p><label>Заметка</label></p>
+          <textarea name="note" class="w-full"></textarea>
+        </div>
+
+        <div class="flex justify-end gap-2">
+          <button type="button" class="btn" id="modal-cancel">Отмена</button>
+          <button type="submit" class="btn btn-primary">Сохранить</button>
+        </div>
+      </form>
+
+      <!-- Форма: Запасы на складах -->
+      <form id="form-stock-warehouse" class="modal-form hidden" data-mode="create" data-id="">
+        <div class="mb-4">
+          <input name="warehouse" type="text" required class="w-full" placeholder="Склад">
+        </div>
+        <div class="mb-4">
+          <select name="nomenclature-id" class="w-full"></select>
+        </div>
+        <div class="mb-4">
+          <input name="quantity" type="number" min="0" step="0.01" required class="w-full" placeholder="Количество">
+        </div>
+        <div class="flex justify-end gap-2">
+          <button type="button" class="btn" id="modal-cancel-2">Отмена</button>
+          <button type="submit" class="btn btn-primary">Сохранить</button>
+        </div>
+      </form>
+
+      <!-- Форма: Запасы в пути -->
+      <form id="form-stock-transit" class="modal-form hidden" data-mode="create" data-id="">
+        <div class="mb-4">
+          <input name="doc-number" type="text" required class="w-full" placeholder="№ Документа">
+        </div>
+        <div class="mb-4">
+          <select name="nomenclature-id" class="w-full"></select>
+        </div>
+        <div class="mb-4">
+          <input name="quantity" type="number" min="0" step="0.01" required class="w-full" placeholder="Количество">
+        </div>
+        <div class="mb-4">
+          <input name="from" type="text" class="w-full" placeholder="Откуда">
+        </div>
+        <div class="mb-4">
+          <input name="to" type="text" class="w-full" placeholder="Куда">
+        </div>
+        <div class="mb-4">
+          <input name="date" type="date" class="w-full">
+        </div>
+        <div class="flex justify-end gap-2">
+          <button type="button" class="btn" id="modal-cancel-3">Отмена</button>
+          <button type="submit" class="btn btn-primary">Сохранить</button>
+        </div>
+      </form>
+
+      <!-- Форма: Запасы в производстве -->
+      <form id="form-stock-production" class="modal-form hidden" data-mode="create" data-id="">
+        <div class="mb-4">
+          <input name="workshop" type="text" required class="w-full" placeholder="Цех">
+        </div>
+        <div class="mb-4">
+          <select name="nomenclature-id" class="w-full"></select>
+        </div>
+        <div class="mb-4">
+          <input name="quantity" type="number" min="0" step="0.01" required class="w-full" placeholder="Количество">
+        </div>
+        <div class="mb-4">
+          <input name="date" type="date" class="w-full" placeholder="Дата списания">
+        </div>
+        <div class="flex justify-end gap-2">
+          <button type="button" class="btn" id="modal-cancel-4">Отмена</button>
+          <button type="submit" class="btn btn-primary">Сохранить</button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+<script type="module" src="/static/js/pages/inventory/main.js"></script>
+{{ end }}
