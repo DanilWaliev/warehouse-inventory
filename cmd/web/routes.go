@@ -11,13 +11,14 @@ func (app *application) routes() *http.ServeMux {
 	mux.HandleFunc("/signout", app.authHandler.SignOut)
 
 	// Страницы
-	mux.HandleFunc("/production", app.authHandler.AccessWithRoles(app.pageHandler.Production, "admin", "productionmanager"))
+	mux.HandleFunc("/production", app.authHandler.AccessWithRoles(app.pageHandler.Production, "admin", "prod_manager"))
 	mux.HandleFunc("/movement", app.authHandler.AccessWithRoles(app.pageHandler.Movement, "admin", "logistics"))
+	mux.HandleFunc("/inventory", app.authHandler.AccessWithRoles(app.pageHandler.Inventory, "admin", "storekeeper"))
 
 	// Запросы к API
-	mux.HandleFunc("/api/tmc", app.authHandler.AccessWithRoles(app.apiHandler.Component, "admin", "productionmanager"))
-	mux.HandleFunc("/api/recipe", app.authHandler.AccessWithRoles(app.apiHandler.Recipe, "admin", "productionmanager"))
-	mux.HandleFunc("/api/order", app.authHandler.AccessWithRoles(app.apiHandler.Order, "admin", "productionmanager"))
+	mux.HandleFunc("/api/tmc", app.authHandler.AccessWithRoles(app.apiHandler.Component, "admin", "prod_manager"))
+	mux.HandleFunc("/api/recipe", app.authHandler.AccessWithRoles(app.apiHandler.Recipe, "admin", "prod_manager"))
+	mux.HandleFunc("/api/order", app.authHandler.AccessWithRoles(app.apiHandler.Order, "admin", "prod_manager"))
 
 	fileServer := http.FileServer(http.Dir("./ui/static"))
 	mux.Handle("/static/", http.StripPrefix("/static", fileServer))
