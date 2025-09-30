@@ -59,3 +59,33 @@ func (s *StorageService) CreateWarehouse(location string, stype string, notes st
 func (s *StorageService) CreateTransitStorage(location string, stype string, transportType string, capacity float64, notes string) error {
 	return s.storageModel.InsertTransitStorage(location, stype, transportType, capacity, notes)
 }
+
+func (s *StorageService) ReadWithInventoryByTypes(types []string) ([]*models.Storage, error) {
+	var storages []*models.Storage
+
+	for _, stype := range types {
+		storagesByType, err := s.storageModel.SelectWithInventoryByType(stype)
+		if err != nil {
+			return nil, err
+		}
+
+		storages = append(storages, storagesByType...)
+	}
+
+	return storages, nil
+}
+
+func (s *StorageService) ReadWithoutInventoryByTypes(types []string) ([]*models.Storage, error) {
+	var storages []*models.Storage
+
+	for _, stype := range types {
+		storagesByType, err := s.storageModel.SelectWithoutInventoryByType(stype)
+		if err != nil {
+			return nil, err
+		}
+
+		storages = append(storages, storagesByType...)
+	}
+
+	return storages, nil
+}

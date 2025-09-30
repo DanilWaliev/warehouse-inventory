@@ -46,24 +46,27 @@ func (h *StorageHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Получаем типы
-	for _, stype := range r.URL.Query()["type"] {
-		types = append(types, stype)
-	}
+	types = append(types, r.URL.Query()["type"]...)
 
 	var (
 		storages []*models.Storage
 		err      error
 	)
 
+	// Обрабатываемые комбинации параметров:
 	switch {
-	case len(ids) > 0 && inventory:
+	case len(ids) > 0 && inventory && len(types) <= 0:
 		storages, err = h.StorageService.ReadWithInventoryByIDs(ids)
-	case len(ids) <= 0 && inventory:
+	case len(ids) <= 0 && inventory && len(types) <= 0:
 		storages, err = h.StorageService.ReadAllWithInventory()
-	case len(ids) > 0 && !inventory:
+	case len(ids) > 0 && !inventory && len(types) <= 0:
 		storages, err = h.StorageService.ReadWithoutInventoryByIDs(ids)
-	case len(ids) <= 0 && !inventory:
+	case len(ids) <= 0 && !inventory && len(types) <= 0:
 		storages, err = h.StorageService.ReadAllWithoutInventory()
+	case len(ids) <= 0 && inventory && len(types) > 0:
+		storages, err = h.StorageService.ReadWithInventoryByTypes(types)
+	case len(ids) <= 0 && !inventory && len(types) > 0:
+		storages, err = h.StorageService.ReadWithoutInventoryByTypes(types)
 	default:
 		h.Helper.ClientError(w, http.StatusBadRequest)
 	}

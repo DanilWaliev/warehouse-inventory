@@ -190,6 +190,115 @@ func (m *StorageModel) SelectAllWithInventory() ([]*models.Storage, error) {
 	return stores, nil
 }
 
+func (m *StorageModel) SelectWithInventoryByType(stype string) ([]*models.Storage, error) {
+	// 1) Шапка хранилища
+	headerStmt := `
+		SELECT s.StorageSite_ID, s.Location, s.Type
+		FROM storagesite s
+		WHERE s.Type = ?;
+	`
+	rows, err := m.DB.Query(headerStmt, stype)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	var storages []*models.Storage
+
+	for rows.Next() {
+		s := &models.Storage{}
+
+		err := rows.Scan(&s.ID, &s.Location, &s.Type)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, models.ErrNoRecord
+			}
+			return nil, err
+		}
+
+		storages = append(storages, s)
+	}
+
+	// 2) Позиции инвентаря (join component)
+	itemsStmt := `
+		SELECT
+			c.Component_ID,
+			c.Name,
+			c.Weight,
+			c.Type,
+			c.Note,
+			i.Quantity
+		FROM inventory i
+		JOIN component c ON c.Component_ID = i.Component_ID
+		WHERE i.Type = ?
+		ORDER BY c.Name;
+	`
+
+	for _, s := range storages {
+		rows, err := m.DB.Query(itemsStmt, stype)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var it models.StorageItem
+			var qtyDec float64
+
+			if err := rows.Scan(
+				&it.Component.ID,
+				&it.Component.Name,
+				&it.Component.Weight,
+				&it.Component.Type,
+				&it.Component.Note,
+				&qtyDec,
+			); err != nil {
+				return nil, err
+			}
+
+			s.Inventory = append(s.Inventory, it)
+		}
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
+	}
+
+	return storages, nil
+}
+
+func (m *StorageModel) SelectWithoutInventoryByType(stype string) ([]*models.Storage, error) {
+	headerStmt := `
+		SELECT s.StorageSite_ID, s.Location, s.Type
+		FROM storagesite s
+		WHERE s.Type = ?;
+	`
+	rows, err := m.DB.Query(headerStmt, stype)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	var storages []*models.Storage
+
+	for rows.Next() {
+		s := &models.Storage{}
+
+		err := rows.Scan(&s.ID, &s.Location, &s.Type)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, models.ErrNoRecord
+			}
+			return nil, err
+		}
+
+		storages = append(storages, s)
+	}
+
+	return storages, nil
+}
+
 // Создание скалада
 func (m *StorageModel) InsertWarehouse(location string, stype string, notes string) error {
 	tx, err := m.DB.Begin()
