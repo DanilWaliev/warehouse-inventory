@@ -115,6 +115,26 @@ func (h *APIHandler) Order(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (h *APIHandler) Storage(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		h.StorageHandler.Get(w, r)
+	case http.MethodPost:
+		h.StorageHandler.Post(w, r)
+	case http.MethodPut:
+		//
+	case http.MethodDelete:
+		//
+	default:
+		w.Header().Set("Allow", strings.Join([]string{
+			http.MethodPost,
+			http.MethodGet,
+			http.MethodPut,
+			http.MethodDelete,
+		}, ", "))
+	}
+}
+
 /* Файл содержит обработчики для запросов к API (получение, удаление, изменение данных) из отображаемой страницы */
 
 // func (h *APIHandler) GetByType(w http.ResponseWriter, r *http.Request) {

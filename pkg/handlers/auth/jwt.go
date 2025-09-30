@@ -48,6 +48,8 @@ func (h *AuthHandler) CreateToken(role, fullname string) (string, error) {
 		"iat":      time.Now().Unix(),
 	}
 
+	fmt.Printf("%+v", claims)
+
 	// Создаем токен, подписываем и передаем строку в tokenString
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(key)

@@ -50,13 +50,14 @@ type OrderItem struct {
 	Quantity int
 }
 
-type Warehouse struct {
+type Storage struct {
 	ID        int
-	Note      string
-	Inventory []WarehouseItem
+	Location  string
+	Type      string
+	Inventory []StorageItem
 }
 
-type WarehouseItem struct {
+type StorageItem struct {
 	Component Component
 	Quantity  int
 }
