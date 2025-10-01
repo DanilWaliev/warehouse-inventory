@@ -1,9 +1,7 @@
-// main.js (точка входа для inventory, type="module")
+﻿// main.js (точка входа для inventory, type="module")
 import { resolveToastConfirm, updateHeaderOffset } from "./utils.js";
 import { initTMC } from "./tmc.js";
-import { initStorage } from "./storage.js";
-// import { initRecipes } from "./recipes.js";
-// import { initOrders } from "./orders.js";
+import { initWarehouse } from "./warehouse.js";
 
 (async function bootstrap() {
   const { showToast, showConfirm } = await resolveToastConfirm();
@@ -12,7 +10,6 @@ import { initStorage } from "./storage.js";
   const sidebar = document.querySelector('.sidebar');
   const tabs = document.querySelectorAll('.sidebar li');
   const sectionTitle = document.getElementById('section-title');
-  const addBtn = document.getElementById('addBtn');
   const modal = document.getElementById('modal');
 
   // формы внутри модалки
@@ -23,16 +20,14 @@ import { initStorage } from "./storage.js";
     production: document.getElementById('form-stock-production'),
   };
 
-  if (!sidebar || !sectionTitle || !addBtn || !modal) {
-    console.error("main.js: не найдены базовые элементы (sidebar/section-title/addBtn/modal). Проверьте шаблон.");
+  if (!sidebar || !sectionTitle || !modal) {
+    console.error("main.js: не найдены базовые элементы (sidebar/section-title/modal). Проверьте шаблон.");
     return;
   }
 
   // инициализация модулей
   const tmcModule = await initTMC({ showToast, showConfirm, modal });
-  const storageModule = await initStorage({ showToast });
-  // const recipesModule = await initRecipes({ showToast, showConfirm, modal });
-  // const ordersModule = await initOrders({ showToast, showConfirm, modal });
+  const warehouseModule = await initWarehouse({ showToast });
 
   let active = 'tmc';
 
@@ -76,12 +71,12 @@ import { initStorage } from "./storage.js";
       table.classList.toggle('hidden', key !== tab);
     });
 
-    if (storageModule) {
+    if (warehouseModule) {
       if (tab === 'stock-warehouse') {
-        if (typeof storageModule.showControls === 'function') storageModule.showControls();
-        if (typeof storageModule.load === 'function') storageModule.load();
-      } else if (typeof storageModule.hideControls === 'function') {
-        storageModule.hideControls();
+        if (typeof warehouseModule.showControls === 'function') warehouseModule.showControls();
+        if (typeof warehouseModule.load === 'function') warehouseModule.load();
+      } else if (typeof warehouseModule.hideControls === 'function') {
+        warehouseModule.hideControls();
       }
     }
 
@@ -90,7 +85,7 @@ import { initStorage } from "./storage.js";
         if (tmcModule && tmcModule.load) tmcModule.load();
         break;
       case 'stock-warehouse':
-        // загрузка выполняется в storageModule.load()
+        // загрузка выполняется в warehouseModule.load()
         break;
       // case 'recipe': if (recipesModule && recipesModule.load) recipesModule.load(); break;
       // case 'order': if (ordersModule && ordersModule.load) ordersModule.load(); break;
@@ -123,8 +118,6 @@ import { initStorage } from "./storage.js";
   }
 
   tabs.forEach(li => li.addEventListener('click', () => setActive(li.dataset.tab)));
-
-  addBtn.addEventListener('click', openModal);
 
   document.querySelectorAll('#modal [id^="modal-cancel"]').forEach(btn => {
     btn.addEventListener('click', closeModal);

@@ -1,4 +1,4 @@
-// utils.js
+﻿// utils.js
 export function escapeHtml(str) {
   if (str === null || str === undefined) return "";
   return String(str)

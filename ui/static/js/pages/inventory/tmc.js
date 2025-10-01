@@ -1,4 +1,4 @@
-// static/js/pages/production/tmc.js
+﻿// static/js/pages/inventory/tmc.js
 import { escapeHtml } from "./utils.js";
 
 /**
@@ -17,6 +17,43 @@ export async function initTMC({ showToast, showConfirm, modal }) {
     console.warn("tmc.js: отсутствуют DOM элементы (table-tmc-body / form-tmc / modal / modal-title).");
     return { load: () => {}, reset: () => {}, openModal: () => {}, openEdit: () => {} };
   }
+
+      // === КНОПКА "Добавить" ТОЛЬКО ДЛЯ ВКЛАДКИ ТМЦ (без гонок) ===
+  const controlRight = document.querySelector('#control-panel .flex');
+  const tmcTable = document.getElementById('table-tmc');
+
+  let addBtn = null;
+  function ensureAddBtn() {
+    if (addBtn || !controlRight) return;
+    addBtn = document.createElement('button');
+    addBtn.className = 'btn btn-primary';
+    addBtn.id = 'addBtn';
+    addBtn.textContent = 'Добавить';
+    addBtn.addEventListener('click', openModal);
+    controlRight.appendChild(addBtn);
+  }
+  function showAddBtn() {
+    ensureAddBtn();
+    if (addBtn) addBtn.classList.remove('hidden');
+  }
+  function hideAddBtn() {
+    if (addBtn) addBtn.classList.add('hidden');
+  }
+  function syncByTableVisibility() {
+    // если таблица ТМЦ видима — показываем кнопку
+    if (tmcTable && !tmcTable.classList.contains('hidden')) showAddBtn();
+    else hideAddBtn();
+  }
+
+  // начальная синхронизация
+  syncByTableVisibility();
+
+  // следим за сменой класса hidden у таблицы ТМЦ (main.js сам переключает классы)
+  if (tmcTable) {
+    const mo = new MutationObserver(syncByTableVisibility);
+    mo.observe(tmcTable, { attributes: true, attributeFilter: ['class'] });
+  }
+  // === /КНОПКА "Добавить" ===
 
   let editingId = null;
 
