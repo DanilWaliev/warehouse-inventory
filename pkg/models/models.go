@@ -52,6 +52,7 @@ type OrderItem struct {
 
 type Storage struct {
 	ID        int
+	Name      string
 	Location  string
 	Type      string
 	Inventory []StorageItem

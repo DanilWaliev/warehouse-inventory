@@ -52,12 +52,12 @@ func (s *StorageService) ReadAllWithoutInventory() ([]*models.Storage, error) {
 	return s.storageModel.SelectAllWithoutInventory()
 }
 
-func (s *StorageService) CreateWarehouse(location string, stype string, notes string) error {
-	return s.storageModel.InsertWarehouse(location, stype, notes)
+func (s *StorageService) CreateWarehouse(name string, location string, stype string, notes string) error {
+	return s.storageModel.InsertWarehouse(name, location, stype, notes)
 }
 
-func (s *StorageService) CreateTransitStorage(location string, stype string, transportType string, capacity float64, notes string) error {
-	return s.storageModel.InsertTransitStorage(location, stype, transportType, capacity, notes)
+func (s *StorageService) CreateTransitStorage(name string, location string, stype string, transportType string, capacity float64, notes string) error {
+	return s.storageModel.InsertTransitStorage(name, location, stype, transportType, capacity, notes)
 }
 
 func (s *StorageService) ReadWithInventoryByTypes(types []string) ([]*models.Storage, error) {

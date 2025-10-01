@@ -22,7 +22,7 @@ func NewStorageModel(db *sql.DB) *StorageModel {
 func (m *StorageModel) SelectWithInventoryByID(storageID int) (*models.Storage, error) {
 	// 1) Шапка хранилища
 	headerStmt := `
-		SELECT s.StorageSite_ID, s.Location, s.Type
+		SELECT s.StorageSite_ID, s.Name, s.Location, s.Type
 		FROM storagesite s
 		WHERE s.StorageSite_ID = ?;
 	`
@@ -30,7 +30,7 @@ func (m *StorageModel) SelectWithInventoryByID(storageID int) (*models.Storage, 
 
 	st := &models.Storage{}
 	var location string
-	if err := row.Scan(&st.ID, &location, &st.Type); err != nil {
+	if err := row.Scan(&st.ID, &st.Name, &location, &st.Type); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, models.ErrNoRecord
 		}
@@ -85,7 +85,7 @@ func (m *StorageModel) SelectWithInventoryByID(storageID int) (*models.Storage, 
 
 func (m *StorageModel) SelectAllWithoutInventory() ([]*models.Storage, error) {
 	rows, err := m.DB.Query(`
-		SELECT s.StorageSite_ID, s.Location, s.Type
+		SELECT s.StorageSite_ID, s.Name, s.Location, s.Type
 		FROM storagesite s
 		ORDER BY s.StorageSite_ID`)
 	if err != nil {
@@ -96,7 +96,7 @@ func (m *StorageModel) SelectAllWithoutInventory() ([]*models.Storage, error) {
 	var res []*models.Storage
 	for rows.Next() {
 		st := &models.Storage{}
-		if err := rows.Scan(&st.ID, &st.Location, &st.Type); err != nil {
+		if err := rows.Scan(&st.ID, &st.Name, &st.Location, &st.Type); err != nil {
 			return nil, err
 		}
 		res = append(res, st)
@@ -109,12 +109,12 @@ func (m *StorageModel) SelectAllWithoutInventory() ([]*models.Storage, error) {
 
 func (m *StorageModel) SelectWithoutInventoryByID(id int) (*models.Storage, error) {
 	row := m.DB.QueryRow(`
-		SELECT s.StorageSite_ID, s.Location, s.Type
+		SELECT s.StorageSite_ID, s.Name, s.Location, s.Type
 		FROM storagesite s
 		WHERE s.StorageSite_ID = ?`, id)
 
 	st := &models.Storage{}
-	if err := row.Scan(&st.ID, &st.Location, &st.Type); err != nil {
+	if err := row.Scan(&st.ID, &st.Name, &st.Location, &st.Type); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, models.ErrNoRecord
 		}
@@ -193,7 +193,7 @@ func (m *StorageModel) SelectAllWithInventory() ([]*models.Storage, error) {
 func (m *StorageModel) SelectWithInventoryByType(stype string) ([]*models.Storage, error) {
 	// 1) Шапка хранилища
 	headerStmt := `
-		SELECT s.StorageSite_ID, s.Location, s.Type
+		SELECT s.StorageSite_ID, s.Name, s.Location, s.Type
 		FROM storagesite s
 		WHERE s.Type = ?;
 	`
@@ -209,7 +209,7 @@ func (m *StorageModel) SelectWithInventoryByType(stype string) ([]*models.Storag
 	for rows.Next() {
 		s := &models.Storage{}
 
-		err := rows.Scan(&s.ID, &s.Location, &s.Type)
+		err := rows.Scan(&s.ID, &s.Name, &s.Location, &s.Type)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, models.ErrNoRecord
@@ -269,7 +269,7 @@ func (m *StorageModel) SelectWithInventoryByType(stype string) ([]*models.Storag
 
 func (m *StorageModel) SelectWithoutInventoryByType(stype string) ([]*models.Storage, error) {
 	headerStmt := `
-		SELECT s.StorageSite_ID, s.Location, s.Type
+		SELECT s.StorageSite_ID, s.Name, s.Location, s.Type
 		FROM storagesite s
 		WHERE s.Type = ?;
 	`
@@ -285,7 +285,7 @@ func (m *StorageModel) SelectWithoutInventoryByType(stype string) ([]*models.Sto
 	for rows.Next() {
 		s := &models.Storage{}
 
-		err := rows.Scan(&s.ID, &s.Location, &s.Type)
+		err := rows.Scan(&s.ID, &s.Name, &s.Location, &s.Type)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, models.ErrNoRecord
@@ -300,7 +300,7 @@ func (m *StorageModel) SelectWithoutInventoryByType(stype string) ([]*models.Sto
 }
 
 // Создание скалада
-func (m *StorageModel) InsertWarehouse(location string, stype string, notes string) error {
+func (m *StorageModel) InsertWarehouse(name, location, stype, notes string) error {
 	tx, err := m.DB.Begin()
 	if err != nil {
 		return err
@@ -314,7 +314,7 @@ func (m *StorageModel) InsertWarehouse(location string, stype string, notes stri
 
 	res, err := tx.Exec(
 		`INSERT INTO storagesite (Name, Type, Location) VALUES (?, ?, ?)`,
-		"warehouse", stype, location,
+		"warehouse", name, stype, location,
 	)
 	if err != nil {
 		_ = tx.Rollback()
@@ -341,7 +341,7 @@ func (m *StorageModel) InsertWarehouse(location string, stype string, notes stri
 	return nil
 }
 
-func (m *StorageModel) InsertTransitStorage(location string, stype string, transportType string, capacity float64, notes string) error {
+func (m *StorageModel) InsertTransitStorage(name, location, stype, transportType string, capacity float64, notes string) error {
 	tx, err := m.DB.Begin()
 	if err != nil {
 		return err
@@ -355,7 +355,7 @@ func (m *StorageModel) InsertTransitStorage(location string, stype string, trans
 
 	res, err := tx.Exec(
 		`INSERT INTO storagesite (Name, Type, Location) VALUES (?, ?, ?)`,
-		"transitstorage", stype, location,
+		"transitstorage", name, stype, location,
 	)
 	if err != nil {
 		_ = tx.Rollback()

@@ -91,6 +91,7 @@ func (h *StorageHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *StorageHandler) Post(w http.ResponseWriter, r *http.Request) {
 	var NewStorage struct {
 		Type          string  `json:"type"`
+		Name          string  `json:"name"`
 		Location      string  `json:"location"`
 		TransportType string  `json:"transportType"`
 		Capacity      float64 `json:"capacity"`
@@ -104,13 +105,13 @@ func (h *StorageHandler) Post(w http.ResponseWriter, r *http.Request) {
 
 	switch NewStorage.Type {
 	case "warehouse":
-		err := h.StorageService.CreateWarehouse(NewStorage.Location, NewStorage.Type, NewStorage.Notes)
+		err := h.StorageService.CreateWarehouse(NewStorage.Name, NewStorage.Location, NewStorage.Type, NewStorage.Notes)
 		if err != nil {
 			h.Helper.ServerError(w, err)
 			return
 		}
 	case "transitstorage":
-		err := h.StorageService.CreateTransitStorage(NewStorage.Location, NewStorage.Type, NewStorage.TransportType, NewStorage.Capacity, NewStorage.Notes)
+		err := h.StorageService.CreateTransitStorage(NewStorage.Name, NewStorage.Location, NewStorage.Type, NewStorage.TransportType, NewStorage.Capacity, NewStorage.Notes)
 		if err != nil {
 			h.Helper.ServerError(w, err)
 			return
