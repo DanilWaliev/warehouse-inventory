@@ -82,6 +82,79 @@ func (m *DocumentModel) SelectByID(id int) (*models.Document, error) {
 	return d, nil
 }
 
+// SelectByType возвращае список документов по типу
+func (m *DocumentModel) SelectByType(dtype string) ([]*models.Document, error) {
+	stmt := `SELECT Document_ID, Type, CreatedAt, CreatedBy, Notes,
+	                MovementOrder_Order_ID, ProductionOrder_ID
+	         FROM document
+	         WHERE Type = ?`
+
+	rows, err := m.DB.Query(stmt, dtype)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var docs []*models.Document
+
+	for rows.Next() {
+		d := &models.Document{}
+		var notes sql.NullString
+		var moID sql.NullInt64
+		var poID sql.NullInt64
+
+		if err := rows.Scan(&d.ID, &d.Type, &d.CreatedAt, &d.CreatedBy, &notes, &moID, &poID); err != nil {
+			return nil, err
+		}
+		if notes.Valid {
+			d.Notes = notes.String
+		}
+		if moID.Valid {
+			v := int(moID.Int64)
+			d.MovementOrderID = &v
+		}
+		if poID.Valid {
+			v := int(poID.Int64)
+			d.ProductionOrderID = &v
+		}
+
+		// подгружаем позиции
+		itemsStmt := `SELECT di.Item_ID, di.Component_ID, c.Name, c.Weight, c.Type, c.Note, di.Quantity
+		              FROM documentitem di
+		              JOIN component c ON di.Component_ID = c.Component_ID
+		              WHERE di.Document_ID = ?`
+
+		itemRows, err := m.DB.Query(itemsStmt, d.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		for itemRows.Next() {
+			it := models.DocumentItem{}
+			var note sql.NullString
+			if err := itemRows.Scan(&it.ID, &it.Component.ID, &it.Component.Name,
+				&it.Component.Weight, &it.Component.Type, &note, &it.Quantity); err != nil {
+				itemRows.Close()
+				return nil, err
+			}
+			if note.Valid {
+				it.Component.Note = note.String
+			}
+			it.DocumentID = d.ID
+			d.Items = append(d.Items, it)
+		}
+		itemRows.Close()
+
+		docs = append(docs, d)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return docs, nil
+}
+
 // SelectAll возвращает список документов без фильтров
 func (m *DocumentModel) SelectAll() ([]*models.Document, error) {
 	stmt := `SELECT Document_ID, Type, CreatedAt, CreatedBy, Notes,

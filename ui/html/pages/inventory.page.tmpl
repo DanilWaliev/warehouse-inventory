@@ -22,9 +22,16 @@
     <section class="content">
 
       <!-- Верхняя панель -->
-      <div class="topbar">
+      <div class="topbar" id="control-panel">
         <h2 id="section-title">ТМЦ</h2>
-        <div>
+        <div class="flex gap-2 items-center">
+          <div id="storage-actions" class="flex gap-2 items-center hidden">
+            <select id="storage-select" class="w-56" aria-label="Склад">
+              <option value="" disabled selected>Выберите склад</option>
+            </select>
+            <button type="button" class="btn" id="storage-purchase">Покупка</button>
+            <button type="button" class="btn btn-danger" id="storage-sale">Продажа</button>
+          </div>
           <button class="btn btn-primary" id="addBtn">Добавить</button>
         </div>
       </div>
