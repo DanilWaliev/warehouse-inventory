@@ -11,6 +11,7 @@
 @import 'pages/signup.css';
 @import 'pages/signin.css';
 @import 'pages/production.css';
+@import 'pages/inventory.css';
 
 /* Импорт стилей для отдельных компонентов страницы */
 @import 'components/header.css';
