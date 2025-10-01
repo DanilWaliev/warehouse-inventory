@@ -61,3 +61,21 @@ type StorageItem struct {
 	Component Component
 	Quantity  int
 }
+
+type Document struct {
+	ID                int
+	Type              string
+	CreatedAt         time.Time
+	CreatedBy         int
+	Notes             string
+	MovementOrderID   *int
+	ProductionOrderID *int
+	Items             []DocumentItem
+}
+
+type DocumentItem struct {
+	ID         int
+	DocumentID int
+	Component  Component
+	Quantity   float64
+}
