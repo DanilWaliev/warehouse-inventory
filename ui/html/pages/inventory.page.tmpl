@@ -136,19 +136,19 @@
         </div>
       </form>
 
-      <!-- Форма: Запасы на складах -->
-      <form id="form-stock-warehouse" class="modal-form hidden" data-mode="create" data-id="">
+      <!-- Форма: Создание склада -->
+      <form id="form-warehouse-create" class="modal-form hidden" data-mode="create" data-id="">
         <div class="mb-4">
-          <input name="warehouse" type="text" required class="w-full" placeholder="Склад">
+          <input name="name" type="text" required class="w-full" placeholder="Название склада">
         </div>
         <div class="mb-4">
-          <select name="nomenclature-id" class="w-full"></select>
+          <input name="location" type="text" required class="w-full" placeholder="Локация">
         </div>
         <div class="mb-4">
-          <input name="quantity" type="number" min="0" step="0.01" required class="w-full" placeholder="Количество">
+          <textarea name="notes" class="w-full" placeholder="Заметка (необязательно)"></textarea>
         </div>
         <div class="flex justify-end gap-2">
-          <button type="button" class="btn" id="modal-cancel-2">Отмена</button>
+          <button type="button" class="btn" id="modal-cancel-warehouse">Отмена</button>
           <button type="submit" class="btn btn-primary">Сохранить</button>
         </div>
       </form>
