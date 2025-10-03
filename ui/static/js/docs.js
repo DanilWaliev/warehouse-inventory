@@ -90,6 +90,3 @@ function closeDoc() {
   formEl?.reset();
   formEl.innerHTML = '';
 }
-
-// Сделать доступным глобально, если нужно из инлайна:
-window.openDoc = openDoc;

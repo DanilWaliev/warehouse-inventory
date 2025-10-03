@@ -1,4 +1,4 @@
-function showConfirm(message, title = "Подтверждение") {
+export function showConfirm(message, title = "Подтверждение") {
   return new Promise((resolve) => {
     const modal = document.getElementById("confirm-modal");
     const titleEl = document.getElementById("confirm-title");
@@ -24,6 +24,4 @@ function showConfirm(message, title = "Подтверждение") {
     btnCancel.addEventListener("click", cancelHandler);
   });
 }
-// Глобальная функция
-window.showConfirm = showConfirm;
 

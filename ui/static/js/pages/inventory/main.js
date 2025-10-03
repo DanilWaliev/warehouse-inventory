@@ -1,11 +1,13 @@
 ﻿// main.js (точка входа для inventory, type="module")
-import { resolveToastConfirm, updateHeaderOffset } from "./utils.js";
+import { updateHeaderOffset } from "./utils.js";
 import { initTMC } from "./tmc.js";
 import { initWarehouse } from "./warehouse.js";
+import { showToast } from "../../toast.js"
+import { showConfirm } from "../../confirm.js";
+
+// TODO: разобраться с модулями
 
 (async function bootstrap() {
-  const { showToast, showConfirm } = await resolveToastConfirm();
-
   // DOM: основные элементы
   const sidebar = document.querySelector('.sidebar');
   const tabs = document.querySelectorAll('.sidebar li');

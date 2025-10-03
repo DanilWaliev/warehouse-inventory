@@ -11,7 +11,6 @@ export function escapeHtml(str) {
 
 export function formatDate(dateStr) {
   if (!dateStr) return "-";
-  // dateStr приходит в формате "2025-09-24T21:22:38Z" — это UTC.
   const d = new Date(dateStr);
   const options = {
     year: "numeric", month: "2-digit", day: "2-digit",
@@ -22,39 +21,36 @@ export function formatDate(dateStr) {
   return d.toLocaleString("ru-RU", options) + " МСК";
 }
 
-/**
- * Попытка получить функции showToast / showConfirm:
- * 1) если уже доступны как глобальные window.showToast/window.showConfirm — используем
- * 2) иначе пытаем динамически импортировать ../toast.js и ../confirm.js
- * 3) если всё не доступно — ставим простые fallback (alert/confirm)
- */
+// Кэш, чтобы не дёргать import повторно
+let _toastFn = null;
+let _confirmFn = null;
+
 export async function resolveToastConfirm() {
-  let showToast = window.showToast;
-  let showConfirm = window.showConfirm;
+  if (_toastFn && _confirmFn) return { showToast: _toastFn, showConfirm: _confirmFn };
 
-  if (typeof showToast === "function" && typeof showConfirm === "function") {
-    return { showToast, showConfirm };
-  }
-
-  // Попробуем динамически импортировать модули (они могут экспортировать именованные функции)
   try {
-    const toastMod = await import('../toast.js');
-    const confirmMod = await import('../confirm.js');
-    showToast = toastMod.showToast || toastMod.default || window.showToast;
-    showConfirm = confirmMod.showConfirm || confirmMod.default || window.showConfirm;
-  } catch (err) {
-    // импорт не удался — возможно файлы не ES-модули. Фолбэк ниже.
-    // console.warn("Не удалось импортировать toast/confirm как модули", err);
+    // utils.js находится в /inventory/, поэтому поднимаемся на уровень выше:
+    const toastMod   = await import("../../toast.js");
+    const confirmMod = await import("../../confirm.js");
+
+    const showToast   = toastMod.showToast   || toastMod.default;
+    const showConfirm = confirmMod.showConfirm || confirmMod.default;
+
+    _toastFn = typeof showToast === "function"
+      ? showToast
+      : (msg, type) => { alert((type ? type + ": " : "") + String(msg)); };
+
+    _confirmFn = typeof showConfirm === "function"
+      ? showConfirm
+      : async (message) => confirm(String(message));
+
+  } catch {
+    // Фолбэки, если модули недоступны
+    _toastFn = (msg, type) => { alert((type ? type + ": " : "") + String(msg)); };
+    _confirmFn = async (message) => confirm(String(message));
   }
 
-  if (typeof showToast !== "function") {
-    showToast = (msg, type) => { alert((type ? type + ": " : "") + String(msg)); };
-  }
-  if (typeof showConfirm !== "function") {
-    showConfirm = async (message, title) => confirm(String(message));
-  }
-
-  return { showToast, showConfirm };
+  return { showToast: _toastFn, showConfirm: _confirmFn };
 }
 
 export function updateHeaderOffset() {

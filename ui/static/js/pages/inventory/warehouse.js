@@ -1,4 +1,7 @@
 // /static/js/pages/inventory/warehouse.js
+
+import { openDoc } from "../../docs.js"
+
 export function initWarehouse({ showToast }) {
   const panel = document.querySelector('#control-panel .flex');
   const tableBody = document.getElementById('table-stock-warehouse-body');
@@ -29,28 +32,72 @@ export function initWarehouse({ showToast }) {
   }
 
   function onBuy() {
-    if (!window.openDoc) { showToast?.('Модалка документов не подключена'); return; }
+    if (!openDoc) { showToast?.('Модалка документов не подключена'); return; }
     if (!sel.value) { showToast?.('Выберите склад'); return; }
-    window.openDoc('purchase', { storageId: sel.value }, () => load());
+    openDoc('purchase', { storageId: sel.value }, () => load());
   }
 
   function onSell() {
-    if (!window.openDoc) { showToast?.('Модалка документов не подключена'); return; }
+    if (!openDoc) { showToast?.('Модалка документов не подключена'); return; }
     if (!sel.value) { showToast?.('Выберите склад'); return; }
-    window.openDoc('sale', { storageId: sel.value }, () => load());
+    openDoc('sale', { storageId: sel.value }, () => load());
   }
 
-  function onAddWarehouse() {
-    // если есть документ создания склада — откроем его
-    if (window.openDoc) {
-      window.openDoc('create-warehouse', {}, async () => {
-        await loadWarehouses();
-        await load();
+function onAddWarehouse() {
+  const modal = document.getElementById('modal');
+  const form = document.getElementById('form-warehouse-create');
+  const modalTitle = document.getElementById('modal-title');
+
+  // спрятать все остальные формы
+  document.querySelectorAll('.modal-form').forEach(f => f.classList.add('hidden'));
+  form.classList.remove('hidden');
+
+  modalTitle.textContent = "Создать склад";
+  modal.classList.remove('hidden');
+  modal.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+
+  // reset формы
+  form.reset();
+
+  // обработчик сохранения
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const payload = {
+      type: "warehouse",
+      name: fd.get("name").toString(),
+      location: fd.get("location").toString(),
+      notes: fd.get("notes").toString(),
+    };
+
+    try {
+      const res = await fetch('/api/storages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
-    } else {
-      showToast?.('Нет обработчика создания склада');
+      if (!res.ok) return showToast("Ошибка при создании склада");
+
+      modal.classList.add('hidden');
+      modal.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = '';
+      await loadWarehouses();
+      await load();
+    } catch (err) {
+      showToast("Ошибка при создании склада")
+      console.log(err)
     }
-  }
+  };
+
+  document.getElementById('modal-cancel-warehouse').onclick = () => {
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    form.reset();
+  };
+}
+
 
   function showControls() {
     if (!panel || wrap) return;
