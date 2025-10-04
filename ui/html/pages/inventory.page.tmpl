@@ -12,6 +12,7 @@
     <aside class="sidebar" id="sidebar">
       <ul>
         <li class="active" data-tab="tmc">ТМЦ</li>
+        <li data-tab="warehouses">Склады</li>
         <li data-tab="stock-warehouse">Запасы на складах</li>
         <li data-tab="stock-transit">Запасы в пути</li>
         <li data-tab="stock-production">Запасы в производстве</li>
@@ -47,6 +48,20 @@
             <tbody id="table-tmc-body">
               
             </tbody>
+          </table>
+
+          <!-- Склады -->
+          <table class="table tab-table hidden" id="table-warehouses">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Название</th>
+                <th>Локация</th>
+                <th>Заметка</th>
+                <th>Действия</th>
+              </tr>
+            </thead>
+            <tbody id="table-warehouses-body"></tbody>
           </table>
 
           <!-- Запасы на складах -->

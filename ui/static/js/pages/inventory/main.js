@@ -1,9 +1,11 @@
 ﻿// main.js (точка входа для inventory, type="module")
 import { updateHeaderOffset } from "./utils.js";
 import { initTMC } from "./tmc.js";
-import { initWarehouse } from "./warehouse.js";
+import { initWarehouseStock } from "./warehouseStock.js";
 import { showToast } from "../../toast.js"
 import { showConfirm } from "../../confirm.js";
+import { initWarehouses } from "./warehouses.js";
+
 
 // TODO: разобраться с модулями
 
@@ -29,7 +31,8 @@ import { showConfirm } from "../../confirm.js";
 
   // инициализация модулей
   const tmcModule = await initTMC({ showToast, showConfirm, modal });
-  const warehouseModule = await initWarehouse({ showToast });
+  const warehousesModule = await initWarehouses({ showToast, showConfirm, modal });
+  const warehouseStockModule = await initWarehouseStock({ showToast });
 
   let active = 'tmc';
 
@@ -65,20 +68,28 @@ import { showConfirm } from "../../confirm.js";
       'stock-warehouse': document.getElementById('table-stock-warehouse'),
       'stock-transit': document.getElementById('table-stock-transit'),
       'stock-production': document.getElementById('table-stock-production'),
-      // recipe: document.getElementById('table-recipe'),
-      // order: document.getElementById('table-order'),
+      'warehouses': document.getElementById('table-warehouses'),
     };
     Object.entries(tables).forEach(([key, table]) => {
       if (!table) return;
       table.classList.toggle('hidden', key !== tab);
     });
 
-    if (warehouseModule) {
+    if (warehouseStockModule) {
       if (tab === 'stock-warehouse') {
-        if (typeof warehouseModule.showControls === 'function') warehouseModule.showControls();
-        if (typeof warehouseModule.load === 'function') warehouseModule.load();
-      } else if (typeof warehouseModule.hideControls === 'function') {
-        warehouseModule.hideControls();
+        if (typeof warehouseStockModule.showControls === 'function') warehouseStockModule.showControls();
+        if (typeof warehouseStockModule.load === 'function') warehouseStockModule.load();
+      } else if (typeof warehouseStockModule.hideControls === 'function') {
+        warehouseStockModule.hideControls();
+      }
+    }
+
+    if (warehousesModule) {
+      if (tab === 'warehouses') {
+        warehousesModule.showControls?.();
+        warehousesModule.load?.();
+      } else {
+        warehousesModule.hideControls?.();
       }
     }
 
@@ -89,8 +100,6 @@ import { showConfirm } from "../../confirm.js";
       case 'stock-warehouse':
         // загрузка выполняется в warehouseModule.load()
         break;
-      // case 'recipe': if (recipesModule && recipesModule.load) recipesModule.load(); break;
-      // case 'order': if (ordersModule && ordersModule.load) ordersModule.load(); break;
     }
   }
 

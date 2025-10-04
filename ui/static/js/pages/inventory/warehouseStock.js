@@ -2,7 +2,7 @@
 
 import { openDoc } from "../../docs.js"
 
-export function initWarehouse({ showToast }) {
+export function initWarehouseStock({ showToast }) {
   const panel = document.querySelector('#control-panel .flex');
   const tableBody = document.getElementById('table-stock-warehouse-body');
 
@@ -10,7 +10,6 @@ export function initWarehouse({ showToast }) {
   let sel = null;         // select склада
   let btnBuy = null;      // Покупка
   let btnSell = null;     // Продажа
-  let btnAddWh = null;    // Добавить склад
 
   async function loadWarehouses(preselect) {
     try {
@@ -43,62 +42,6 @@ export function initWarehouse({ showToast }) {
     openDoc('sale', { storageId: sel.value }, () => load());
   }
 
-function onAddWarehouse() {
-  const modal = document.getElementById('modal');
-  const form = document.getElementById('form-warehouse-create');
-  const modalTitle = document.getElementById('modal-title');
-
-  // спрятать все остальные формы
-  document.querySelectorAll('.modal-form').forEach(f => f.classList.add('hidden'));
-  form.classList.remove('hidden');
-
-  modalTitle.textContent = "Создать склад";
-  modal.classList.remove('hidden');
-  modal.setAttribute('aria-hidden', 'false');
-  document.body.style.overflow = 'hidden';
-
-  // reset формы
-  form.reset();
-
-  // обработчик сохранения
-  form.onsubmit = async (e) => {
-    e.preventDefault();
-    const fd = new FormData(form);
-    const payload = {
-      type: "warehouse",
-      name: fd.get("name").toString(),
-      location: fd.get("location").toString(),
-      notes: fd.get("notes").toString(),
-    };
-
-    try {
-      const res = await fetch('/api/storage', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) return showToast("Ошибка при создании склада");
-
-      modal.classList.add('hidden');
-      modal.setAttribute('aria-hidden', 'true');
-      document.body.style.overflow = '';
-      await loadWarehouses();
-      await load();
-    } catch (err) {
-      showToast("Ошибка при создании склада")
-      console.log(err)
-    }
-  };
-
-  document.getElementById('modal-cancel-warehouse').onclick = () => {
-    modal.classList.add('hidden');
-    modal.setAttribute('aria-hidden', 'true');
-    document.body.style.overflow = '';
-    form.reset();
-  };
-}
-
-
   function showControls() {
     if (!panel || wrap) return;
 
@@ -110,11 +53,6 @@ function onAddWarehouse() {
     sel.id = 'warehouse-select';
     sel.className = 'w-full';
     sel.addEventListener('change', load);
-
-    btnAddWh = document.createElement('button');
-    btnAddWh.className = 'btn';
-    btnAddWh.textContent = 'Добавить склад';
-    btnAddWh.addEventListener('click', onAddWarehouse);
 
     btnBuy = document.createElement('button');
     btnBuy.className = 'btn btn-primary';
@@ -128,7 +66,6 @@ function onAddWarehouse() {
 
     // порядок: select | Добавить склад | Покупка | Продажа
     wrap.appendChild(sel);
-    wrap.appendChild(btnAddWh);
     wrap.appendChild(btnBuy);
     wrap.appendChild(btnSell);
 
@@ -141,7 +78,6 @@ function onAddWarehouse() {
   function hideControls() {
     if (!wrap) return;
     sel?.removeEventListener('change', load);
-    btnAddWh?.removeEventListener('click', onAddWarehouse);
     btnBuy?.removeEventListener('click', onBuy);
     btnSell?.removeEventListener('click', onSell);
     wrap.remove();
