@@ -1,3 +1,9 @@
 .topbar .flex > * + * {
   margin-left: var(--spacing-2);
 }
+
+/* Фиксированный селект склада */
+#warehouse-select {
+  width: 220px; /* фиксируем ширину */
+  max-width: 100%;
+}

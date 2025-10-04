@@ -55,7 +55,7 @@ import { initWarehouses } from "./warehouses.js";
 
     const titles = {
       tmc: 'ТМЦ',
-      'stock-warehouse': 'Запасы на складах',
+      'stock-warehouse': 'Запасы на складе',
       'stock-transit': 'Запасы в пути',
       'stock-production': 'Запасы в производстве',
       recipe: 'Рецептуры',
