@@ -39,7 +39,7 @@ function ensureModal() {
 }
 
 async function fillStorages(sel, pre) {
-  const res = await fetch('/api/storages'); if (!res.ok) return;
+  const res = await fetch('/api/storage'); if (!res.ok) return;
   const data = await res.json(); // ожидается [{ID,Name}]
   sel.innerHTML = data.map(s => `<option value="${s.ID}">${s.Name}</option>`).join('');
   if (pre) sel.value = pre;
@@ -68,13 +68,13 @@ export function openDoc(type, preset = {}, onSuccess) {
     const fd = new FormData(formEl);
     const data = Object.fromEntries(fd.entries());
     data.quantity = parseInt(data.quantity || '0', 10);
-    if (!data.storageId || !data.componentId || data.quantity <= 0) return alert('Заполните поля');
+    if (!data.storageId || !data.componentId || data.quantity <= 0) return showToast('Заполните поля');
 
     const r = await def.submit(data);
-    if (!r.ok) return alert('Ошибка проведения');
+    if (!r.ok) return showToast('Ошибка проведения');
     closeDoc();
     onSuccess && onSuccess();
-    alert('Документ проведён');
+    showToast('Документ проведён');
   };
 
   modalEl.classList.remove('hidden');

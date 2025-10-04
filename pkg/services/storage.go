@@ -52,8 +52,8 @@ func (s *StorageService) ReadAllWithoutInventory() ([]*models.Storage, error) {
 	return s.storageModel.SelectAllWithoutInventory()
 }
 
-func (s *StorageService) CreateWarehouse(name string, location string, stype string, notes string) error {
-	return s.storageModel.InsertWarehouse(name, location, stype, notes)
+func (s *StorageService) CreateWarehouse(name string, location string, notes string) error {
+	return s.storageModel.InsertWarehouse(name, location, notes)
 }
 
 func (s *StorageService) CreateTransitStorage(name string, location string, stype string, transportType string, capacity float64, notes string) error {

@@ -105,7 +105,7 @@ func (h *StorageHandler) Post(w http.ResponseWriter, r *http.Request) {
 
 	switch NewStorage.Type {
 	case "warehouse":
-		err := h.StorageService.CreateWarehouse(NewStorage.Name, NewStorage.Location, NewStorage.Type, NewStorage.Notes)
+		err := h.StorageService.CreateWarehouse(NewStorage.Name, NewStorage.Location, NewStorage.Notes)
 		if err != nil {
 			h.Helper.ServerError(w, err)
 			return

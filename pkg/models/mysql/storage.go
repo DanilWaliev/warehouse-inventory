@@ -300,7 +300,7 @@ func (m *StorageModel) SelectWithoutInventoryByType(stype string) ([]*models.Sto
 }
 
 // Создание скалада
-func (m *StorageModel) InsertWarehouse(name, location, stype, notes string) error {
+func (m *StorageModel) InsertWarehouse(name, location, notes string) error {
 	tx, err := m.DB.Begin()
 	if err != nil {
 		return err
@@ -314,7 +314,7 @@ func (m *StorageModel) InsertWarehouse(name, location, stype, notes string) erro
 
 	res, err := tx.Exec(
 		`INSERT INTO storagesite (Name, Type, Location) VALUES (?, ?, ?)`,
-		"warehouse", name, stype, location,
+		name, "warehouse", location,
 	)
 	if err != nil {
 		_ = tx.Rollback()

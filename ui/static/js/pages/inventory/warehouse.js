@@ -17,7 +17,7 @@ export function initWarehouse({ showToast }) {
       const res = await fetch('/api/storage?type=warehouse&inventory=false');
       if (!res.ok) throw new Error();
       const data = await res.json(); // [{ID,Name,Location,Type,...}]
-      sel.innerHTML = data.map(s => `<option value="${s.ID}">${s.Name}</option>`).join('');
+      sel.innerHTML = data.map(s => `<option value="${s.ID}">${s.Name} - ${s.Location}</option>`).join('');
       if (preselect) sel.value = String(preselect);
       if (!sel.value && data[0]) sel.value = String(data[0].ID);
     } catch (e) {
@@ -72,7 +72,7 @@ function onAddWarehouse() {
     };
 
     try {
-      const res = await fetch('/api/storages', {
+      const res = await fetch('/api/storage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
