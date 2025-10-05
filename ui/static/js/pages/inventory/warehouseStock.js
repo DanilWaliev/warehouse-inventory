@@ -34,8 +34,58 @@ export function initWarehouseStock({ showToast }) {
   }
 
   async function load() {
-    // TODO: сюда подгрузи остатки по выбранному складу, когда появится эндпоинт
-    if (tableBody) tableBody.innerHTML = '';
+    if (!tableBody) return;
+    if (!sel?.value) { tableBody.innerHTML = ''; return; }
+
+    tableBody.innerHTML = '';
+
+    try {
+      const url = `/api/storage?id=${encodeURIComponent(sel.value)}&inventory=true`;
+      const res = await fetch(url);
+
+      if (res.status === 404) {
+        tableBody.innerHTML = `<tr><td colspan="4" class="text-muted">Нет запасов</td></tr>`;
+        return;
+      }
+      if (!res.ok) throw new Error('inventory load failed');
+
+      const payload = await res.json();
+      // ожидаем объект склада с полем Inventory ([]). На всякий — достанем аккуратно:
+      const inventory = Array.isArray(payload)
+        ? (payload[0]?.Inventory || [])
+        : (payload?.Inventory || []);
+
+      if (!inventory.length) {
+        tableBody.innerHTML = `<tr><td colspan="4" class="text-muted">Нет запасов</td></tr>`;
+        return;
+      }
+
+      // Рисуем строки: ТМЦ | Количество | Вес (кг) | Действия
+      for (const it of inventory) {
+        const tr = document.createElement('tr');
+
+        const tdName = document.createElement('td');
+        tdName.textContent = it?.Component?.Name ?? '';
+
+        const tdQty = document.createElement('td');
+        tdQty.textContent = String(it?.Quantity ?? '');
+
+        const tdWeight = document.createElement('td');
+        // показываем вес компонента (если нужен другой — скажи)
+        tdWeight.textContent = String(it?.Component?.Weight ?? '');
+
+        const tdActions = document.createElement('td');
+        // пока без действий — оставим пустым
+        tdActions.textContent = '';
+
+        tr.append(tdName, tdQty, tdWeight, tdActions);
+        tableBody.appendChild(tr);
+      }
+    } catch (e) {
+      console.error(e);
+      showToast?.('Ошибка загрузки запасов');
+      tableBody.innerHTML = `<tr><td colspan="4" class="text-muted">Нет запасов</td></tr>`;
+    }
   }
 
   function onBuy() {

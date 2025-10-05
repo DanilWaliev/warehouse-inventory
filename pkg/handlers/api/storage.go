@@ -121,3 +121,55 @@ func (h *StorageHandler) Post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
+
+func (h *StorageHandler) Put(w http.ResponseWriter, r *http.Request) {
+	var UpdatedStorage struct {
+		ID            int     `json:"id"`
+		Type          string  `json:"type"`
+		Name          string  `json:"name"`
+		Location      string  `json:"location"`
+		TransportType string  `json:"transportType"`
+		Capacity      float64 `json:"capacity"`
+		Notes         string  `json:"notes"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&UpdatedStorage); err != nil {
+		h.Helper.ClientError(w, http.StatusBadRequest)
+		return
+	}
+
+	switch UpdatedStorage.Type {
+	case "warehouse":
+		err := h.StorageService.UpdateWarehouse(UpdatedStorage.ID, UpdatedStorage.Name, UpdatedStorage.Location, UpdatedStorage.Notes)
+		if err != nil {
+			h.Helper.ServerError(w, err)
+			return
+		}
+	case "transitstorage":
+		err := h.StorageService.UpdateTransitStorage(UpdatedStorage.ID, UpdatedStorage.Name, UpdatedStorage.Location, UpdatedStorage.TransportType, UpdatedStorage.Capacity, UpdatedStorage.Notes)
+		if err != nil {
+			h.Helper.ServerError(w, err)
+			return
+		}
+	default:
+		h.Helper.ClientError(w, http.StatusBadRequest)
+		return
+	}
+}
+
+// Принимает в параметре URL Id компонента, который надо удалить
+func (h *StorageHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.URL.Query().Get("id"))
+	if err != nil {
+		h.Helper.ClientError(w, http.StatusBadRequest)
+		return
+	}
+
+	err = h.StorageService.Delete(id)
+	if err != nil {
+		h.Helper.ServerError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}

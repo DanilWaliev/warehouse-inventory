@@ -122,9 +122,9 @@ func (h *APIHandler) Storage(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		h.StorageHandler.Post(w, r)
 	case http.MethodPut:
-		//
+		h.StorageHandler.Put(w, r)
 	case http.MethodDelete:
-		//
+		h.StorageHandler.Delete(w, r)
 	default:
 		w.Header().Set("Allow", strings.Join([]string{
 			http.MethodPost,

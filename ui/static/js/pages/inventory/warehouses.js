@@ -2,7 +2,7 @@
 export function initWarehouses({ showToast, showConfirm, modal }) {
   const panelRight = document.querySelector('#control-panel .flex');
   const modalTitle = document.getElementById('modal-title');
-  const form = document.getElementById('form-warehouse-admin');
+  const form = document.getElementById('form-warehouse-create');
   const tbody = document.getElementById('table-warehouses-body');
 
   let addBtn = null;
@@ -34,9 +34,9 @@ export function initWarehouses({ showToast, showConfirm, modal }) {
     if (!r.ok) throw new Error('create');
   }
   async function update(id, payload) {
-    const r = await fetch(`/api/storage?id=${id}`, {
+    const r = await fetch(`/api/storage`, {
       method:'PUT', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ type:'warehouse', ...payload })
+      body: JSON.stringify({ id: id, type:'warehouse', ...payload })
     });
     if (!r.ok) throw new Error('update');
   }
@@ -67,7 +67,7 @@ export function initWarehouses({ showToast, showConfirm, modal }) {
           <td>${s.ID}</td>
           <td>${s.Name || ''}</td>
           <td>${s.Location || ''}</td>
-          <td>${s.Notes || ''}</td>
+          <td>${s.Note || ''}</td>
           <td>
             <button class="btn-edit" data-id="${s.ID}">Изменить</button>
             <button class="btn-delete" data-id="${s.ID}">Удалить</button>
@@ -154,7 +154,7 @@ export function initWarehouses({ showToast, showConfirm, modal }) {
     }
   });
 
-  document.getElementById('modal-cancel-warehouse-admin')?.addEventListener('click', closeModal);
+  document.getElementById('modal-cancel-warehouse-create')?.addEventListener('click', closeModal);
 
   return { showControls, hideControls, load };
 }

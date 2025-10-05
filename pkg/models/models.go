@@ -55,6 +55,7 @@ type Storage struct {
 	Name      string
 	Location  string
 	Type      string
+	Note      *string
 	Inventory []StorageItem
 }
 

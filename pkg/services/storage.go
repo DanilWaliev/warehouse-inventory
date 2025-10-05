@@ -89,3 +89,24 @@ func (s *StorageService) ReadWithoutInventoryByTypes(types []string) ([]*models.
 
 	return storages, nil
 }
+
+func (s *StorageService) UpdateWarehouse(id int, name string, location string, notes string) error {
+	return s.storageModel.UpdateWarehouse(id, name, location, notes)
+}
+
+func (s *StorageService) UpdateTransitStorage(id int, name string, location string, transportType string, capacity float64, notes string) error {
+	return s.storageModel.UpdateTransitStorage(id, name, location, transportType, capacity, notes)
+}
+
+func (s *StorageService) Delete(id int) error {
+	storage, err := s.storageModel.SelectWithoutInventoryByID(id)
+	if err != nil {
+		return err
+	}
+
+	if storage.Type == "warehouse" {
+		return s.storageModel.DeleteWarehouse(id)
+	} else {
+		return s.storageModel.DeleteTransitStorage(id)
+	}
+}

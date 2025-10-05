@@ -17,12 +17,10 @@ func NewStorageModel(db *sql.DB) *StorageModel {
 }
 
 // SelectWithInventoryByID возвращает хранилище и весь его инвентарь.
-// Storage.Note <- storagesite.Location
-// Storage.Type <- storagesite.Type
 func (m *StorageModel) SelectWithInventoryByID(storageID int) (*models.Storage, error) {
 	// 1) Шапка хранилища
 	headerStmt := `
-		SELECT s.StorageSite_ID, s.Name, s.Location, s.Type
+		SELECT s.StorageSite_ID, s.Name, s.Location, s.Type, s.Note
 		FROM storagesite s
 		WHERE s.StorageSite_ID = ?;
 	`
@@ -30,7 +28,7 @@ func (m *StorageModel) SelectWithInventoryByID(storageID int) (*models.Storage, 
 
 	st := &models.Storage{}
 	var location string
-	if err := row.Scan(&st.ID, &st.Name, &location, &st.Type); err != nil {
+	if err := row.Scan(&st.ID, &st.Name, &location, &st.Type, &st.Note); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, models.ErrNoRecord
 		}
@@ -85,7 +83,7 @@ func (m *StorageModel) SelectWithInventoryByID(storageID int) (*models.Storage, 
 
 func (m *StorageModel) SelectAllWithoutInventory() ([]*models.Storage, error) {
 	rows, err := m.DB.Query(`
-		SELECT s.StorageSite_ID, s.Name, s.Location, s.Type
+		SELECT s.StorageSite_ID, s.Name, s.Location, s.Type, s.Note
 		FROM storagesite s
 		ORDER BY s.StorageSite_ID`)
 	if err != nil {
@@ -96,7 +94,7 @@ func (m *StorageModel) SelectAllWithoutInventory() ([]*models.Storage, error) {
 	var res []*models.Storage
 	for rows.Next() {
 		st := &models.Storage{}
-		if err := rows.Scan(&st.ID, &st.Name, &st.Location, &st.Type); err != nil {
+		if err := rows.Scan(&st.ID, &st.Name, &st.Location, &st.Type, &st.Note); err != nil {
 			return nil, err
 		}
 		res = append(res, st)
@@ -109,12 +107,12 @@ func (m *StorageModel) SelectAllWithoutInventory() ([]*models.Storage, error) {
 
 func (m *StorageModel) SelectWithoutInventoryByID(id int) (*models.Storage, error) {
 	row := m.DB.QueryRow(`
-		SELECT s.StorageSite_ID, s.Name, s.Location, s.Type
+		SELECT s.StorageSite_ID, s.Name, s.Location, s.Type, s.Note
 		FROM storagesite s
 		WHERE s.StorageSite_ID = ?`, id)
 
 	st := &models.Storage{}
-	if err := row.Scan(&st.ID, &st.Name, &st.Location, &st.Type); err != nil {
+	if err := row.Scan(&st.ID, &st.Name, &st.Location, &st.Type, &st.Note); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, models.ErrNoRecord
 		}
@@ -126,7 +124,7 @@ func (m *StorageModel) SelectWithoutInventoryByID(id int) (*models.Storage, erro
 func (m *StorageModel) SelectAllWithInventory() ([]*models.Storage, error) {
 	// 1) Загружаем все хранилища
 	rows, err := m.DB.Query(`
-		SELECT s.StorageSite_ID, s.Location, s.Type
+		SELECT s.StorageSite_ID, s.Location, s.Type, s.Note
 		FROM storagesite s
 		ORDER BY s.StorageSite_ID`)
 	if err != nil {
@@ -138,7 +136,7 @@ func (m *StorageModel) SelectAllWithInventory() ([]*models.Storage, error) {
 	idx := make(map[int]*models.Storage)
 	for rows.Next() {
 		st := &models.Storage{}
-		if err := rows.Scan(&st.ID, &st.Location, &st.Type); err != nil {
+		if err := rows.Scan(&st.ID, &st.Location, &st.Type, &st.Note); err != nil {
 			return nil, err
 		}
 		stores = append(stores, st)
@@ -193,7 +191,7 @@ func (m *StorageModel) SelectAllWithInventory() ([]*models.Storage, error) {
 func (m *StorageModel) SelectWithInventoryByType(stype string) ([]*models.Storage, error) {
 	// 1) Шапка хранилища
 	headerStmt := `
-		SELECT s.StorageSite_ID, s.Name, s.Location, s.Type
+		SELECT s.StorageSite_ID, s.Name, s.Location, s.Type, s.Note
 		FROM storagesite s
 		WHERE s.Type = ?;
 	`
@@ -209,7 +207,7 @@ func (m *StorageModel) SelectWithInventoryByType(stype string) ([]*models.Storag
 	for rows.Next() {
 		s := &models.Storage{}
 
-		err := rows.Scan(&s.ID, &s.Name, &s.Location, &s.Type)
+		err := rows.Scan(&s.ID, &s.Name, &s.Location, &s.Type, &s.Note)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, models.ErrNoRecord
@@ -269,7 +267,7 @@ func (m *StorageModel) SelectWithInventoryByType(stype string) ([]*models.Storag
 
 func (m *StorageModel) SelectWithoutInventoryByType(stype string) ([]*models.Storage, error) {
 	headerStmt := `
-		SELECT s.StorageSite_ID, s.Name, s.Location, s.Type
+		SELECT s.StorageSite_ID, s.Name, s.Location, s.Type, s.Note
 		FROM storagesite s
 		WHERE s.Type = ?;
 	`
@@ -285,7 +283,7 @@ func (m *StorageModel) SelectWithoutInventoryByType(stype string) ([]*models.Sto
 	for rows.Next() {
 		s := &models.Storage{}
 
-		err := rows.Scan(&s.ID, &s.Name, &s.Location, &s.Type)
+		err := rows.Scan(&s.ID, &s.Name, &s.Location, &s.Type, &s.Note)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, models.ErrNoRecord
@@ -300,7 +298,7 @@ func (m *StorageModel) SelectWithoutInventoryByType(stype string) ([]*models.Sto
 }
 
 // Создание скалада
-func (m *StorageModel) InsertWarehouse(name, location, notes string) error {
+func (m *StorageModel) InsertWarehouse(name, location, note string) error {
 	tx, err := m.DB.Begin()
 	if err != nil {
 		return err
@@ -313,8 +311,8 @@ func (m *StorageModel) InsertWarehouse(name, location, notes string) error {
 	}()
 
 	res, err := tx.Exec(
-		`INSERT INTO storagesite (Name, Type, Location) VALUES (?, ?, ?)`,
-		name, "warehouse", location,
+		`INSERT INTO storagesite (Name, Type, Location, Note) VALUES (?, ?, ?, ?)`,
+		name, "warehouse", location, note,
 	)
 	if err != nil {
 		_ = tx.Rollback()
@@ -327,8 +325,8 @@ func (m *StorageModel) InsertWarehouse(name, location, notes string) error {
 	}
 
 	_, err = tx.Exec(
-		`INSERT INTO warehouse (StorageSite_ID, Notes) VALUES (?, ?)`,
-		id, notes,
+		`INSERT INTO warehouse (StorageSite_ID) VALUES (?)`,
+		id,
 	)
 	if err != nil {
 		_ = tx.Rollback()
@@ -341,7 +339,7 @@ func (m *StorageModel) InsertWarehouse(name, location, notes string) error {
 	return nil
 }
 
-func (m *StorageModel) InsertTransitStorage(name, location, stype, transportType string, capacity float64, notes string) error {
+func (m *StorageModel) InsertTransitStorage(name, location, stype, transportType string, capacity float64, note string) error {
 	tx, err := m.DB.Begin()
 	if err != nil {
 		return err
@@ -354,8 +352,8 @@ func (m *StorageModel) InsertTransitStorage(name, location, stype, transportType
 	}()
 
 	res, err := tx.Exec(
-		`INSERT INTO storagesite (Name, Type, Location) VALUES (?, ?, ?)`,
-		"transitstorage", name, stype, location,
+		`INSERT INTO storagesite (Name, Type, Location, Note) VALUES (?, ?, ?. ?)`,
+		name, "transitstorage", location, note,
 	)
 	if err != nil {
 		_ = tx.Rollback()
@@ -368,8 +366,8 @@ func (m *StorageModel) InsertTransitStorage(name, location, stype, transportType
 	}
 
 	_, err = tx.Exec(
-		`INSERT INTO transitstorage (StorageSite_ID, TransportType, Capacity, Notes) VALUES (?, ?, ?, ?)`,
-		id, transportType, capacity, notes,
+		`INSERT INTO transitstorage (StorageSite_ID, TransportType, Capacity) VALUES (?, ?, ?)`,
+		id, transportType, capacity,
 	)
 	if err != nil {
 		_ = tx.Rollback()
@@ -380,4 +378,126 @@ func (m *StorageModel) InsertTransitStorage(name, location, stype, transportType
 		return err
 	}
 	return nil
+}
+
+// Обновление склада
+func (m *StorageModel) UpdateWarehouse(id int, name, location, note string) error {
+	tx, err := m.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if p := recover(); p != nil {
+			_ = tx.Rollback()
+			panic(p)
+		}
+	}()
+
+	// обновляем общую таблицу
+	_, err = tx.Exec(
+		`UPDATE storagesite SET Name=?, Location=?, Note=? WHERE StorageSite_ID=? AND Type='warehouse'`,
+		name, location, note, id,
+	)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Обновление транзитного хранилища
+func (m *StorageModel) UpdateTransitStorage(
+	id int, name, location, transportType string, capacity float64, note string,
+) error {
+	tx, err := m.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if p := recover(); p != nil {
+			_ = tx.Rollback()
+			panic(p)
+		}
+	}()
+
+	// обновляем storagesite
+	_, err = tx.Exec(
+		`UPDATE storagesite SET Name=?, Location=?, Note=? WHERE StorageSite_ID=? AND Type='transitstorage'`,
+		name, location, note, id,
+	)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	// обновляем доп. данные по транзитному хранилищу
+	_, err = tx.Exec(
+		`UPDATE transitstorage SET TransportType=?, Capacity=? WHERE StorageSite_ID=?`,
+		transportType, capacity, id,
+	)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// DeleteWarehouse удаляет склад и запись в storagesite.
+func (m *StorageModel) DeleteWarehouse(id int) error {
+	tx, err := m.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if p := recover(); p != nil {
+			_ = tx.Rollback()
+			panic(p)
+		}
+	}()
+
+	// Сначала удаляем запись-спутник
+	if _, err := tx.Exec(`DELETE FROM warehouse WHERE StorageSite_ID = ?`, id); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	// Потом сам сторедж-сайт
+	if _, err := tx.Exec(`DELETE FROM storagesite WHERE StorageSite_ID = ? AND Type = 'warehouse'`, id); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	return tx.Commit()
+}
+
+// DeleteTransitStorage удаляет транзитное хранилище и запись в storagesite.
+func (m *StorageModel) DeleteTransitStorage(id int) error {
+	tx, err := m.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if p := recover(); p != nil {
+			_ = tx.Rollback()
+			panic(p)
+		}
+	}()
+
+	// Сначала удаляем запись-спутник
+	if _, err := tx.Exec(`DELETE FROM transitstorage WHERE StorageSite_ID = ?`, id); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	// Потом сам сторедж-сайт
+	if _, err := tx.Exec(`DELETE FROM storagesite WHERE StorageSite_ID = ? AND Type = 'transitstorage'`, id); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	return tx.Commit()
 }
