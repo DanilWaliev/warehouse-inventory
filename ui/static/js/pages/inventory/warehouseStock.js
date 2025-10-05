@@ -1,5 +1,5 @@
 // /static/js/pages/inventory/warehouseStock.js
-import { openDoc } from "../../docs.js";
+import { openDoc, openDocList } from "../../docs.js";
 
 export function initWarehouseStock({ showToast }) {
   const controlPanel   = document.getElementById('control-panel');
@@ -13,6 +13,7 @@ export function initWarehouseStock({ showToast }) {
   let btnSell = null;
   let titleBlock = null;    // обёртка слева (h2 + select) — создаём только для этой вкладки
   let createdTitleBlock = false;
+  let btnDocs = null;
 
   async function loadWarehouses(preselect) {
     try {
@@ -143,6 +144,19 @@ export function initWarehouseStock({ showToast }) {
       wrap.appendChild(btnBuy);
       wrap.appendChild(btnSell);
       panelRight.appendChild(wrap);
+
+      btnDocs = document.createElement('button');
+      btnDocs.className = 'btn';
+      btnDocs.textContent = 'Документы';
+      btnDocs.addEventListener('click', () => {
+        if (!sel?.value) { showToast?.('Выберите склад'); return; }
+        openDocList({ storageId: sel.value });
+      });
+    
+      wrap.appendChild(btnBuy);
+      wrap.appendChild(btnSell);
+      wrap.appendChild(btnDocs);   // ← добавить
+      panelRight.appendChild(wrap);
     }
 
     // загрузить данные
@@ -169,6 +183,8 @@ export function initWarehouseStock({ showToast }) {
       titleBlock = null;
       createdTitleBlock = false;
     }
+
+    if (btnDocs) { btnDocs.onclick = null; btnDocs.remove(); btnDocs = null; }
   }
 
   return { showControls, hideControls, load };
