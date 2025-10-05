@@ -100,6 +100,7 @@ func (h *ComponentHandler) Post(w http.ResponseWriter, r *http.Request) {
 		} else {
 			h.Helper.ServerError(w, err)
 		}
+		return
 	}
 
 	w.WriteHeader(http.StatusCreated)
