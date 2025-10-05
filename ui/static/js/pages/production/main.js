@@ -1,6 +1,5 @@
 // main.js (точка входа для production, type="module")
 import { resolveToastConfirm, updateHeaderOffset } from "./utils.js";
-import { initTMC } from "./tmc.js";
 import { initRecipes } from "./recipes.js";
 import { initOrders } from "./orders.js";
 
@@ -16,7 +15,6 @@ import { initOrders } from "./orders.js";
 
   // формы внутри модалки
   const forms = {
-    tmc: document.getElementById('form-tmc'),
     recipe: document.getElementById('form-recipe'),
     order: document.getElementById('form-order')
   };
@@ -28,11 +26,10 @@ import { initOrders } from "./orders.js";
   }
 
   // инициализация модулей
-  const tmcModule = await initTMC({ showToast, showConfirm, modal });
   const recipesModule = await initRecipes({ showToast, showConfirm, modal });
   const ordersModule = await initOrders({ showToast, showConfirm, modal });
 
-  let active = 'tmc';
+  let active = 'recipe';
 
   // helper: скрыть все формы внутри модалки
   function hideAllModalForms() {
@@ -53,11 +50,10 @@ import { initOrders } from "./orders.js";
   function setActive(tab) {
     active = tab;
     tabs.forEach(li => li.classList.toggle('active', li.dataset.tab === tab));
-    sectionTitle.textContent = tab === 'tmc' ? 'ТМЦ' : tab === 'recipe' ? 'Рецептуры' : 'Заказы';
+    sectionTitle.textContent = tab === 'recipe' ? 'Рецептуры' : 'Заказы';
 
     // показываем/скрываем таблицы
     const tables = {
-      tmc: document.getElementById('table-tmc'),
       recipe: document.getElementById('table-recipe'),
       order: document.getElementById('table-order')
     };
@@ -68,7 +64,6 @@ import { initOrders } from "./orders.js";
 
     // загрузка данных для вкладки
     switch (tab) {
-      case 'tmc': if (tmcModule && tmcModule.load) tmcModule.load(); break;
       case 'recipe': if (recipesModule && recipesModule.load) recipesModule.load(); break;
       case 'order': if (ordersModule && ordersModule.load) ordersModule.load(); break;
     }
@@ -84,7 +79,6 @@ import { initOrders } from "./orders.js";
     showModalForm(active);
 
     // даём модулям подготовить данные (заполнить селекты)
-    if (active === 'tmc' && tmcModule && tmcModule.openModal) tmcModule.openModal();
     if (active === 'recipe' && recipesModule && recipesModule.openModal) recipesModule.openModal();
     if (active === 'order' && ordersModule && ordersModule.openModal) ordersModule.openModal();
 
@@ -99,7 +93,6 @@ import { initOrders } from "./orders.js";
     document.body.style.overflow = '';
 
     // пытаемся сбросить формы через модули
-    if (tmcModule && tmcModule.reset) tmcModule.reset();
     if (recipesModule && recipesModule.reset) recipesModule.reset();
     if (ordersModule && ordersModule.reset) ordersModule.reset();
 

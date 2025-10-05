@@ -196,7 +196,6 @@ export async function initTMC({ showToast, showConfirm, modal }) {
       }
 
       if (!res.ok) {
-        // можно детализировать по статусу
         switch (res.status) {
           case 409:
             showToast("ТМЦ уже существует")

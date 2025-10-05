@@ -14,7 +14,6 @@
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
       <ul>
-        <li class="active" data-tab="tmc">ТМЦ</li>
         <li data-tab="recipe">Рецептуры</li>
         <li data-tab="order">Заказы</li>
       </ul>
@@ -25,33 +24,16 @@
 
       <!-- Верхняя панель: заголовок секции и кнопка Добавить -->
       <div class="topbar">
-        <h2 id="section-title">ТМЦ</h2>
+        <h2 id="section-title">Рецептуры</h2>
         <div>
           <button class="btn btn-primary" id="addBtn">Добавить</button>
         </div>
       </div>
 
       <!-- Карточка со списком: внутри таблицы.
-           Здесь мы выводим 3 таблицы (по одной на сущность) и показываем только активную -->
+           Здесь мы выводим 2 таблицы (по одной на сущность) и показываем только активную -->
       <div class="card item-list">
         <div class="table-wrap">
-
-          <!-- ТМЦ -->
-          <table class="table tab-table" id="table-tmc">
-            <thead>
-              <tr>
-                <th>Название</th>
-                <th>Вес (кг)</th>
-                <th>Тип</th>
-                <th>Заметка</th>
-                <th>Действия</th>
-              </tr>
-            </thead>
-            <tbody id="table-tmc-body">
-              
-            </tbody>
-          </table>
-
           <!-- Рецептуры -->
           <table class="table tab-table hidden" id="table-recipe">
             <thead>
@@ -98,36 +80,6 @@
     <div class="modal-content" role="document">
       <!-- Общий заголовок модалки -->
       <h3 id="modal-title" class="mb-4">Добавить</h3>
-
-      <!-- Форма: ТМЦ -->
-      <form id="form-tmc" class="modal-form" data-mode="create" data-id="">
-        <div class="mb-4">
-          <input name="name" type="text" required class="w-full" placeholder="Название">
-        </div>
-
-        <div class="mb-4">
-          <input name="weight" type="number" step="0.01" required class="w-full" placeholder="Вес (кг)">
-        </div>
-
-        <div class="mb-4">
-          <select name="type" class="w-full">
-            <option value="raw">Сырье</option>
-            <option value="semi">Полуфабрикат</option>
-            <option value="product">Продукт</option>
-          </select>
-        </div>
-
-        <div class="mb-4">
-          <p><label>Заметка</label></p>
-          <textarea name="note" class="w-full"></textarea>
-        </div>
-
-        <div class="flex justify-end gap-2">
-          <button type="button" class="btn" id="modal-cancel">Отмена</button>
-          <button type="submit" class="btn btn-primary">Сохранить</button>
-        </div>
-      </form>
-
       <!-- Форма: Рецептура -->
       <form id="form-recipe" class="modal-form" data-mode="create" data-id="">
         <div class="mb-4">
