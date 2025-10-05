@@ -197,7 +197,16 @@ export async function initTMC({ showToast, showConfirm, modal }) {
 
       if (!res.ok) {
         // можно детализировать по статусу
-        showToast("Ошибка при сохранении ТМЦ");
+        switch (res.status) {
+          case 409:
+            showToast("ТМЦ уже существует")
+            break;
+          case 400:
+            showToast("Некорректные данные")
+            break
+          default:
+            showToast("Ошибка при сохранении ТМЦ")
+        }
         return;
       }
 
