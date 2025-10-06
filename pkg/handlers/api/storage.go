@@ -120,6 +120,8 @@ func (h *StorageHandler) Post(w http.ResponseWriter, r *http.Request) {
 		h.Helper.ClientError(w, http.StatusBadRequest)
 		return
 	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 func (h *StorageHandler) Put(w http.ResponseWriter, r *http.Request) {
