@@ -16,7 +16,7 @@ func NewStorageModel(db *sql.DB) *StorageModel {
 	}
 }
 
-// SelectWithInventoryByID возвращает хранилище и весь его инвентарь.
+// Возвращает хранилище и весь его инвентарь.
 func (m *StorageModel) SelectWithInventoryByID(storageID int) (*models.Storage, error) {
 	// 1) Шапка хранилища
 	headerStmt := `

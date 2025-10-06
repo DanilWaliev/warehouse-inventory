@@ -60,6 +60,7 @@ type Storage struct {
 }
 
 type StorageItem struct {
+	ID        int
 	Component Component
 	Quantity  int
 }
@@ -72,12 +73,12 @@ type Document struct {
 	Notes             string
 	MovementOrderID   *int
 	ProductionOrderID *int
+	StorageID         *int
 	Items             []DocumentItem
 }
 
 type DocumentItem struct {
-	ID         int
-	DocumentID int
-	Component  Component
-	Quantity   float64
+	ID        int
+	Component Component
+	Quantity  int
 }

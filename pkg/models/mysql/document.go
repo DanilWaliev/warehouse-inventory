@@ -3,6 +3,7 @@ package mysql
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"warehouse-inventory/pkg/models"
 )
 
@@ -72,7 +73,6 @@ func (m *DocumentModel) SelectByID(id int) (*models.Document, error) {
 		if note.Valid {
 			it.Component.Note = note.String
 		}
-		it.DocumentID = d.ID
 		d.Items = append(d.Items, it)
 	}
 	if err := rows.Err(); err != nil {
@@ -140,7 +140,6 @@ func (m *DocumentModel) SelectByType(dtype string) ([]*models.Document, error) {
 			if note.Valid {
 				it.Component.Note = note.String
 			}
-			it.DocumentID = d.ID
 			d.Items = append(d.Items, it)
 		}
 		itemRows.Close()
@@ -213,7 +212,6 @@ func (m *DocumentModel) SelectAll() ([]*models.Document, error) {
 			if note.Valid {
 				it.Component.Note = note.String
 			}
-			it.DocumentID = d.ID
 			d.Items = append(d.Items, it)
 		}
 		itemRows.Close()
@@ -236,32 +234,86 @@ func (m *DocumentModel) Insert(d *models.Document) error {
 	}
 	defer tx.Rollback()
 
-	stmt := `INSERT INTO document (Type, CreatedBy, Notes, MovementOrder_Order_ID, ProductionOrder_ID)
-	         VALUES (?, ?, ?, ?, ?)`
+	// 1) вставляем шапку документа
+	stmt := `INSERT INTO document (Type, CreatedBy, Notes, MovementOrder_Order_ID, ProductionOrder_ID, StorageSite_ID)
+	         VALUES (?, ?, ?, ?, ?, ?)`
 	res, err := tx.Exec(stmt,
 		d.Type,
 		d.CreatedBy,
 		d.Notes,
 		d.MovementOrderID,
 		d.ProductionOrderID,
+		d.StorageID, // для buy/sale обязателен (есть CHECK)
 	)
 	if err != nil {
 		return err
 	}
-
 	docID, err := res.LastInsertId()
 	if err != nil {
 		return err
 	}
 	d.ID = int(docID)
 
-	stmt = `INSERT INTO documentitem (Document_ID, Component_ID, Quantity)
-	        VALUES (?, ?, ?)`
-	for _, item := range d.Items {
-		_, err := tx.Exec(stmt, d.ID, item.Component.ID, item.Quantity)
-		if err != nil {
+	// 2) позиции документа
+	stmt = `INSERT INTO documentitem (Document_ID, Component_ID, Quantity) VALUES (?, ?, ?)`
+	for _, it := range d.Items {
+		if _, err := tx.Exec(stmt, d.ID, it.Component.ID, it.Quantity); err != nil {
 			return err
 		}
+	}
+
+	// 3) движение по складу
+	switch d.Type {
+	case "buy":
+		if d.StorageID == nil {
+			return fmt.Errorf("storage required for buy")
+		}
+		for _, it := range d.Items {
+			if it.Quantity <= 0 {
+				continue
+			}
+			// UNIQUE(Component_ID,StorageSite_ID) предполагается
+			_, err := tx.Exec(`
+				INSERT INTO inventory (Component_ID, StorageSite_ID, Quantity)
+				VALUES (?, ?, ?)
+				ON DUPLICATE KEY UPDATE Quantity = Quantity + VALUES(Quantity)
+			`, it.Component.ID, *d.StorageID, it.Quantity)
+			if err != nil {
+				return err
+			}
+		}
+
+	case "sale":
+		if d.StorageID == nil {
+			return fmt.Errorf("storage required for sale")
+		}
+		for _, it := range d.Items {
+			if it.Quantity <= 0 {
+				continue
+			}
+			// уменьшаем только если хватает остатка
+			res, err := tx.Exec(`
+				UPDATE inventory
+				   SET Quantity = Quantity - ?
+				 WHERE Component_ID = ?
+				   AND StorageSite_ID = ?
+				   AND Quantity >= ?
+			`, it.Quantity, it.Component.ID, *d.StorageID, it.Quantity)
+			if err != nil {
+				return err
+			}
+			aff, _ := res.RowsAffected()
+			if aff == 0 {
+				return fmt.Errorf("insufficient stock for component %d", it.Component.ID)
+			}
+			// чистить нули:
+			_, err = tx.Exec(`DELETE FROM inventory WHERE Component_ID=? AND StorageSite_ID=? AND Quantity=0`, it.Component.ID, *d.StorageID)
+			if err != nil {
+				return fmt.Errorf("error when cleaning zeros in component %v", it.Component.ID)
+			}
+		}
+	default:
+		// TODO: для send/receive/writeoff/output — добавить логику позже
 	}
 
 	return tx.Commit()
