@@ -144,8 +144,8 @@ function closeListModal() {
 /* =========================
    ДАННЫЕ ДЛЯ СЕЛЕКТОВ
    ========================= */
-async function fetchStorages() {
-  const r = await fetch("/api/storage?type=warehouse&inventory=false");
+async function fetchStorages(type) {
+  const r = await fetch(`/api/storage?type=${type}&inventory=false`);
   if (!r.ok) return [];
   return await r.json(); // [{ID,Name,Location}]
 }
@@ -162,7 +162,7 @@ async function fetchInventory(storageId) {
   return inv; // [{Component:{ID,Name,Weight}, Quantity}]
 }
 async function fetchRecipes() {
-  const r = await fetch("/api/recipe"); // если понадобится
+  const r = await fetch("/api/recipe");
   if (!r.ok) return [];
   return await r.json();
 }
@@ -171,7 +171,7 @@ async function fillBySource(select, source, ctx = {}) {
   select.innerHTML = "";
   switch (source) {
     case "storages": {
-      const data = await fetchStorages();
+      const data = await fetchStorages("warehouse");
       select.innerHTML = data.map(s =>
         `<option value="${s.ID}">${s.Name}${s.Location ? " — " + s.Location : ""}</option>`
       ).join("");
