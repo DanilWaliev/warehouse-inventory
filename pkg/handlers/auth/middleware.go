@@ -17,6 +17,7 @@ func (h *AuthHandler) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		user := &AuthorizedUser{
+			ID:       claims["id"].(int),
 			FullName: claims["fullname"].(string),
 			Role:     claims["role"].(string),
 		}
