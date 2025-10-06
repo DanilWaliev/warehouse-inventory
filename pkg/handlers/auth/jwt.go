@@ -36,7 +36,7 @@ func (h *AuthHandler) ParseToken(r *http.Request) (jwt.MapClaims, error) {
 }
 
 // Получает роль и имя, возвращает новый токен для указанного имени и роли
-func (h *AuthHandler) CreateToken(role, fullname string) (string, error) {
+func (h *AuthHandler) CreateToken(id int, role, fullname string) (string, error) {
 	// Получаем секретный ключ для подписания
 	key := h.JWTkey
 
@@ -44,6 +44,7 @@ func (h *AuthHandler) CreateToken(role, fullname string) (string, error) {
 	claims := jwt.MapClaims{
 		"fullname": fullname,
 		"role":     role,
+		"id":       id,
 		"exp":      time.Now().Add(time.Hour * 24).Unix(),
 		"iat":      time.Now().Unix(),
 	}

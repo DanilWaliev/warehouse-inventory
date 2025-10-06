@@ -55,7 +55,7 @@ func (h *AuthHandler) SignIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Отправляем куки с токеном
-	tokenString, err := h.CreateToken(user.Role, user.FullName)
+	tokenString, err := h.CreateToken(user.ID, user.Role, user.FullName)
 	if err != nil {
 		h.helper.ServerError(w, err)
 		return
