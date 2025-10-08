@@ -16,6 +16,7 @@ type APIHandler struct {
 	UserHandler      *UserHandler
 	OrderHandler     *OrderHandler
 	StorageHandler   *StorageHandler
+	DocumentHandler  *DocumentHandler
 }
 
 func NewAPIHandler(helper *handlers.LogHelper, services *services.Services) *APIHandler {
@@ -26,6 +27,7 @@ func NewAPIHandler(helper *handlers.LogHelper, services *services.Services) *API
 		UserHandler:      NewUserHandler(helper, services.UserService),
 		OrderHandler:     NewOrderHandler(helper, services.OrderService),
 		StorageHandler:   NewStorageHandler(helper, services.StorageService),
+		DocumentHandler:  NewDocumentHandler(helper, services.DocumentService),
 	}
 }
 
@@ -131,6 +133,20 @@ func (h *APIHandler) Storage(w http.ResponseWriter, r *http.Request) {
 			http.MethodGet,
 			http.MethodPut,
 			http.MethodDelete,
+		}, ", "))
+	}
+}
+
+func (h *APIHandler) Document(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		h.DocumentHandler.Get(w, r)
+	case http.MethodPost:
+		h.DocumentHandler.Post(w, r)
+	default:
+		w.Header().Set("Allow", strings.Join([]string{
+			http.MethodPost,
+			http.MethodGet,
 		}, ", "))
 	}
 }
