@@ -16,8 +16,10 @@ func (h *AuthHandler) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
+		//fmt.Printf("\n\n\nclaims[\"id\"]=%v\n\n\n", claims["id"])
+
 		user := &AuthorizedUser{
-			ID:       claims["id"].(int),
+			ID:       int(claims["id"].(float64)),
 			FullName: claims["fullname"].(string),
 			Role:     claims["role"].(string),
 		}
