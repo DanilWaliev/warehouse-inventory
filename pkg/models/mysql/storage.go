@@ -59,7 +59,6 @@ func (m *StorageModel) SelectWithInventoryByID(storageID int) (*models.Storage, 
 
 	for rows.Next() {
 		var it models.StorageItem
-		var qtyDec float64
 
 		if err := rows.Scan(
 			&it.Component.ID,
@@ -67,7 +66,7 @@ func (m *StorageModel) SelectWithInventoryByID(storageID int) (*models.Storage, 
 			&it.Component.Weight,
 			&it.Component.Type,
 			&it.Component.Note,
-			&qtyDec,
+			&it.Quantity,
 		); err != nil {
 			return nil, err
 		}
