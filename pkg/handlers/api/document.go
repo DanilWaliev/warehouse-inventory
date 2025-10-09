@@ -98,7 +98,7 @@ func (h *DocumentHandler) Post(w http.ResponseWriter, r *http.Request) {
 	case "buy":
 		newDoc = &models.Document{
 			Type:      "buy",
-			CreatedBy: senderUser.ID, // TODO: пофиксить работу с контекстом (первым делом)
+			CreatedBy: senderUser.ID,
 			Notes:     newDocInput.Notes,
 			StorageID: &newDocInput.StorageId,
 			Items: []models.DocumentItem{{
@@ -111,7 +111,7 @@ func (h *DocumentHandler) Post(w http.ResponseWriter, r *http.Request) {
 	case "sale":
 		newDoc = &models.Document{
 			Type:      "sale",
-			CreatedBy: r.Context().Value("ID").(int),
+			CreatedBy: senderUser.ID,
 			Notes:     newDocInput.Notes,
 			StorageID: &newDocInput.StorageId,
 			Items:     newDocItems,
