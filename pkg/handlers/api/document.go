@@ -82,18 +82,18 @@ func (h *DocumentHandler) Post(w http.ResponseWriter, r *http.Request) {
 		Notes       string `json:"notes"`
 	}
 
-	var (
-		newDoc      *models.Document
-		newDocItems []models.DocumentItem
-	)
+	var newDoc *models.Document
 
-	json.NewDecoder(r.Body).Decode(&newDocInput)
+	err := json.NewDecoder(r.Body).Decode(&newDocInput)
+	if err != nil {
+		h.Helper.ClientError(w, http.StatusBadRequest)
+		return
+	}
 
 	// Получаем данные об отправителе
 	senderUser := r.Context().Value(auth.UserContextKey).(*auth.AuthorizedUser)
 
 	// Парсинг в зависимости от типа документа
-	var err error
 	switch docType {
 	case "buy":
 		newDoc = &models.Document{
@@ -114,7 +114,10 @@ func (h *DocumentHandler) Post(w http.ResponseWriter, r *http.Request) {
 			CreatedBy: senderUser.ID,
 			Notes:     newDocInput.Notes,
 			StorageID: &newDocInput.StorageId,
-			Items:     newDocItems,
+			Items: []models.DocumentItem{{
+				Component: models.Component{ID: newDocInput.ComponentID},
+				Quantity:  newDocInput.Quantity,
+			}},
 		}
 
 		err = h.DocumentService.Create(newDoc)
