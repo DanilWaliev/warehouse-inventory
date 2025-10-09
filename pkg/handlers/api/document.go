@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"warehouse-inventory/pkg/handlers"
+	"warehouse-inventory/pkg/handlers/auth"
 	"warehouse-inventory/pkg/models"
 	"warehouse-inventory/pkg/services"
 )
@@ -75,13 +76,10 @@ func (h *DocumentHandler) Post(w http.ResponseWriter, r *http.Request) {
 	docType := r.URL.Query().Get("type")
 
 	var newDocInput struct {
-		StorageId int    `json:"storageId"`
-		CreatedBy int    `json:"createdBy"`
-		Notes     string `json:"notes"`
-		Items     []struct {
-			ComponentID int `json:"componentId"`
-			Quantity    int `json:"quantity"`
-		}
+		StorageId   int    `json:"storageId"`
+		ComponentID int    `json:"componentId"`
+		Quantity    int    `json:"quantity"`
+		Notes       string `json:"notes"`
 	}
 
 	var (
@@ -89,17 +87,10 @@ func (h *DocumentHandler) Post(w http.ResponseWriter, r *http.Request) {
 		newDocItems []models.DocumentItem
 	)
 
-	// Парсимм позиции в срез DocumentItem
-	for _, inputItem := range newDocInput.Items {
-		newItem := models.DocumentItem{
-			Component: models.Component{
-				ID: inputItem.ComponentID,
-			},
-			Quantity: inputItem.Quantity,
-		}
+	json.NewDecoder(r.Body).Decode(&newDocInput)
 
-		newDocItems = append(newDocItems, newItem)
-	}
+	// Получаем данные об отправителе
+	senderUser := r.Context().Value(auth.UserContextKey).(*auth.AuthorizedUser)
 
 	// Парсинг в зависимости от типа документа
 	var err error
@@ -107,10 +98,13 @@ func (h *DocumentHandler) Post(w http.ResponseWriter, r *http.Request) {
 	case "buy":
 		newDoc = &models.Document{
 			Type:      "buy",
-			CreatedBy: r.Context().Value("ID").(int),
+			CreatedBy: senderUser.ID, // TODO: пофиксить работу с контекстом (первым делом)
 			Notes:     newDocInput.Notes,
 			StorageID: &newDocInput.StorageId,
-			Items:     newDocItems,
+			Items: []models.DocumentItem{{
+				Component: models.Component{ID: newDocInput.ComponentID},
+				Quantity:  newDocInput.Quantity,
+			}},
 		}
 
 		err = h.DocumentService.Create(newDoc)
