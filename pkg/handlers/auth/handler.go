@@ -103,6 +103,7 @@ func (h *AuthHandler) SignUp(w http.ResponseWriter, r *http.Request) {
 		return
 	} else if err != nil {
 		h.helper.ServerError(w, err)
+		return
 	}
 
 	err := h.UserService.AddUser(fullname, phone, email, password, role)

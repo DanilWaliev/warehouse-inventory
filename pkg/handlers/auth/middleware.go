@@ -16,15 +16,13 @@ func (h *AuthHandler) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		//fmt.Printf("\n\n\nclaims[\"id\"]=%v\n\n\n", claims["id"])
-
 		user := &AuthorizedUser{
 			ID:       int(claims["id"].(float64)),
 			FullName: claims["fullname"].(string),
 			Role:     claims["role"].(string),
 		}
 
-		ctx := context.WithValue(r.Context(), userContextKey, user)
+		ctx := context.WithValue(r.Context(), UserContextKey, user)
 		next(w, r.WithContext(ctx))
 	}
 }
@@ -32,7 +30,7 @@ func (h *AuthHandler) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 // Проверяет имеет ли пользователь из контекста запроса указанную роль, если имеет
 func (h *AuthHandler) RequireRoles(next http.HandlerFunc, roles []string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctxUser := r.Context().Value(userContextKey)
+		ctxUser := r.Context().Value(UserContextKey)
 		if ctxUser == nil {
 			h.helper.ClientError(w, http.StatusForbidden)
 			return

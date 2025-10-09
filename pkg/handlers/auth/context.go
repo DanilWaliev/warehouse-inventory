@@ -4,7 +4,7 @@ package auth
 
 type contextKey string
 
-const userContextKey = contextKey("user")
+const UserContextKey = contextKey("user")
 
 // Структура для хранения данных о пользователе в контексте
 type AuthorizedUser struct {
