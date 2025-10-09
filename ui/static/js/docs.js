@@ -360,12 +360,24 @@ if (def.kind === "buy" || def.kind === "sale") {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
-    if (!r.ok) throw 0;
+      if (!r.ok) {
+        switch (r.status) {
+          case 409:
+            showToast("Документ уже существует")
+            break;
+          case 400:
+            showToast("Некорректные данные")
+            break
+          default:
+            showToast("Ошибка при сохранении ТМЦ")
+        }
+        return;
+    };
     closeDoc();
     onSuccess && onSuccess();
     showToast("Документ проведён", "success");
-  } catch {
-    showToast("Ошибка проведения");
+  } catch (err) {
+    showToast("Ошибка проведения:" + err);
   }
 };
 
@@ -446,7 +458,7 @@ export async function openDocList({ storageId, type } = {}) {
   listBody.innerHTML = "";
 
   const qs = new URLSearchParams();
-  if (storageId) qs.set("storageId", storageId);
+  if (storageId) qs.set("storage", storageId);
   if (type)      qs.set("type", type); // buy|sale|transfer|production
   const url = qs.toString() ? `/api/document?${qs}` : "/api/document";
 

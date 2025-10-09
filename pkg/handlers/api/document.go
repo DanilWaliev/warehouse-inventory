@@ -8,6 +8,7 @@ import (
 	"warehouse-inventory/pkg/handlers/auth"
 	"warehouse-inventory/pkg/models"
 	"warehouse-inventory/pkg/services"
+	"warehouse-inventory/pkg/sqlerr"
 )
 
 type DocumentHandler struct {
@@ -24,7 +25,6 @@ func NewDocumentHandler(helper *handlers.LogHelper, documentService *services.Do
 
 func (h *DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	types := r.URL.Query()["type"]
-
 	var ids []int
 	for _, idStr := range r.URL.Query()["id"] {
 		id, err := strconv.Atoi(idStr)
@@ -35,8 +35,20 @@ func (h *DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
 		ids = append(ids, id)
 	}
 
+	var storages []int // id складов
+	for _, storageStr := range r.URL.Query()["storage"] {
+		storage, err := strconv.Atoi(storageStr)
+		if err != nil {
+			h.Helper.ServerError(w, err)
+		}
+
+		storages = append(storages, storage)
+	}
+
 	// Валидация
-	if len(types) > 0 && len(ids) > 0 {
+	if (len(ids) > 0 && (len(types) > 0 || len(storages) > 0)) ||
+		(len(types) > 0 && (len(ids) > 0 || len(storages) > 0)) ||
+		(len(storages) > 0 && (len(ids) > 0 || len(types) > 0)) {
 		h.Helper.ClientError(w, http.StatusBadRequest)
 	}
 
@@ -50,6 +62,8 @@ func (h *DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
 		documents, err = h.DocumentService.ReadByTypes(types)
 	case len(ids) > 0:
 		documents, err = h.DocumentService.ReadByIDs(ids)
+	case len(storages) > 0:
+		documents, err = h.DocumentService.ReadByStorages(storages)
 	default:
 		h.Helper.ClientError(w, http.StatusBadRequest)
 		return
@@ -127,7 +141,13 @@ func (h *DocumentHandler) Post(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		h.Helper.ServerError(w, err)
+		if sqlerr.Is(err, sqlerr.ErrDuplicateEntry) {
+			h.Helper.ClientError(w, http.StatusConflict)
+		} else if sqlerr.Is(err, sqlerr.ErrCheckConstraint) {
+			h.Helper.ClientError(w, http.StatusBadRequest)
+		} else {
+			h.Helper.ServerError(w, err)
+		}
 		return
 	}
 

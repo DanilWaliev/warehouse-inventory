@@ -49,6 +49,21 @@ func (s *DocumentService) ReadByTypes(types []string) ([]*models.Document, error
 	return documents, nil
 }
 
+func (s *DocumentService) ReadByStorages(storages []int) ([]*models.Document, error) {
+	var documents []*models.Document
+
+	for _, storage := range storages {
+		docs, err := s.documentModel.SelectByStorage(storage)
+		if err != nil {
+			return nil, err
+		}
+
+		documents = append(documents, docs...)
+	}
+
+	return documents, nil
+}
+
 func (s *DocumentService) Create(doc *models.Document) error {
 	return s.documentModel.Insert(doc)
 }
