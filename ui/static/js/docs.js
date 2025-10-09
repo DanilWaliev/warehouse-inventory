@@ -9,7 +9,7 @@ const DOCS = {
     title: "Покупка",
     kind: "buy", // POST /api/document?type=buy
     fields: [
-      { name: "storageId",   label: "Склад",      type: "select",  source: "storages",   required: true },
+      { name: "storageId",   label: "Склад",      type: "select",  source: "storages",   disabled: true },
       { name: "componentId", label: "ТМЦ",        type: "select",  source: "components", required: true },
       { name: "quantity",    label: "Количество", type: "number",  min: 1, step: 1, value: 1, required: true },
       { name: "notes",       label: "Заметки",    type: "textarea" }
@@ -19,7 +19,7 @@ const DOCS = {
     title: "Продажа",
     kind: "sale", // POST /api/document?type=sale
     fields: [
-      { name: "storageId",   label: "Склад",      type: "select",  source: "storages",  required: true },
+      { name: "storageId",   label: "Склад",      type: "select",  source: "storages",  disabled: true },
       { name: "componentId", label: "ТМЦ",        type: "select",  source: "inventory", required: true }, // только из инвентаря выбранного склада
       { name: "quantity",    label: "Количество", type: "number",  min: 1, step: 1, value: 1, required: true },
       { name: "notes",       label: "Заметки",    type: "textarea" }
@@ -166,6 +166,12 @@ async function fetchRecipes() {
   if (!r.ok) return [];
   return await r.json();
 }
+async function fetchStorageOne(id) {
+  const r = await fetch(`/api/storage?id=${encodeURIComponent(id)}&inventory=false`);
+  if (!r.ok) return null;
+  const d = await r.json();
+  return Array.isArray(d) ? d[0] : d; // {ID, Name, Location, ...}
+}
 
 async function fillBySource(select, source, ctx = {}) {
   select.innerHTML = "";
@@ -179,7 +185,7 @@ async function fillBySource(select, source, ctx = {}) {
     }
     case "components": {
       const data = await fetchComponents();
-      select.innerHTML = data.map(c => `<option value="${c.ID}">${c.Name}</option>`).join("");
+      select.innerHTML = data.map(c => `<option value=${c.ID}>${c.Name}</option>`).join("");
       break;
     }
     case "inventory": {
@@ -225,21 +231,17 @@ async function fillBySource(select, source, ctx = {}) {
    ========================= */
 function renderField(f) {
   const req = f.required ? "required" : "";
-  const common = `name="${f.name}" id="fld-${f.name}" ${req}`;
-  if (f.type === "select") {
-    return `<div class="mb-3"><label>${f.label}</label><select ${common}></select></div>`;
-  }
+  const dis = f.disabled ? "disabled" : "";
+  const common = `name="${f.name}" id="fld-${f.name}" ${req} ${dis}`;
+  if (f.type === "select") return `<div class="mb-3"><label>${f.label}</label><select ${common}></select></div>`;
   if (f.type === "number") {
-    const min  = f.min  != null ? `min="${f.min}"`   : "";
-    const step = f.step != null ? `step="${f.step}"` : "";
-    const val  = f.value!= null ? `value="${f.value}"` : "";
+    const min = f.min!=null?`min="${f.min}"`:""; const step=f.step!=null?`step="${f.step}"`:""; const val=f.value!=null?`value="${f.value}"`:"";
     return `<div class="mb-3"><label>${f.label}</label><input type="number" ${common} ${min} ${step} ${val}></div>`;
   }
-  if (f.type === "textarea") {
-    return `<div class="mb-3"><label>${f.label}</label><textarea ${common} class="w-full"></textarea></div>`;
-  }
+  if (f.type === "textarea") return `<div class="mb-3"><label>${f.label}</label><textarea ${common} class="w-full"></textarea></div>`;
   return "";
 }
+
 
 /* =========================
    ОТКРЫТЬ ДОКУМЕНТ (СОЗДАНИЕ)
@@ -251,15 +253,54 @@ export function openDoc(type, preset = {}, onSuccess) {
 
   docTitle.textContent = def.title;
   const now = new Date();
+  //TODO: поменять на полное имя
   docMeta.innerHTML = `
     <div>Тип: <strong>${def.title}</strong></div>
-    <div>Создал: <strong>Вы</strong></div>
+    <div>Создал: <strong>Вы</strong></div> 
     <div>Дата: <strong>${now.toLocaleString("ru-RU")}</strong></div>
   `;
 
   // собрать форму
   const inner = def.fields.map(renderField).join("");
   docForm.innerHTML = inner; // заметки уже в schema как textarea
+
+  // === фиксируем склад для buy/sale ===
+if (def.kind === "buy" || def.kind === "sale") {
+  const curId = preset.storageId ?? preset.storageID; // на всякий
+  if (!curId) { showToast("Текущий склад не задан"); return; }
+
+  // скрытый input для отправки
+  let hidden = docForm.querySelector('input[name="storageId"]');
+  if (!hidden) {
+    hidden = document.createElement("input");
+    hidden.type = "hidden";
+    hidden.name = "storageId";
+    docForm.appendChild(hidden);
+  }
+  hidden.value = String(curId);
+
+  // визуальный вывод склада вместо селекта
+  const sel = docForm.querySelector("#fld-storageId");
+  const wrap = sel?.closest(".mb-3");
+  const view = document.createElement("div");
+  view.className = "mb-3";
+  view.innerHTML = `<label>Склад</label><div id="fld-storageId-view" class="text-muted">Загрузка...</div>`;
+  if (wrap) wrap.replaceWith(view);
+
+  // подтянем имя склада для отображения (не влияет на отправку)
+  (async () => {
+    try {
+      const r = await fetch(`/api/storage?id=${encodeURIComponent(curId)}&inventory=false`);
+      const d = r.ok ? await r.json() : null;
+      const s = Array.isArray(d) ? d[0] : d;
+      const v = document.getElementById("fld-storageId-view");
+      if (v) v.textContent = s ? `${s.Name}${s.Location ? " — " + s.Location : ""}` : `#${curId}`;
+    } catch {
+      const v = document.getElementById("fld-storageId-view");
+      if (v) v.textContent = `#${curId}`;
+    }
+  })();
+}
 
   // включить редактирование
   Array.from(docForm.elements).forEach(el => el.disabled = false);
@@ -294,67 +335,40 @@ export function openDoc(type, preset = {}, onSuccess) {
         if (preset[f.name]) el.value = String(preset[f.name]);
       }
     }
-
-    // зависимость от смены склада
-    const storageEl = docForm.querySelector("#fld-storageId");
-    if (storageEl) {
-      storageEl.onchange = async () => {
-        for (const f of def.fields) {
-          if (f.source === "inventory") {
-            const target = docForm.querySelector(`#fld-${f.name}`);
-            await fillBySource(target, "inventory", { storageId: storageEl.value });
-          }
-        }
-      };
-    }
-    const fromEl = docForm.querySelector("#fld-fromStorageId");
-    if (fromEl) {
-      fromEl.onchange = async () => {
-        for (const f of def.fields) {
-          if (f.source === "inventoryFrom") {
-            const target = docForm.querySelector(`#fld-${f.name}`);
-            await fillBySource(target, "inventoryFrom", { fromStorageId: fromEl.value });
-          }
-        }
-      };
-    }
   })();
 
-  // submit -> /api/document?type=buy|sale|...
-  docForm.onsubmit = async (e) => {
-    e.preventDefault();
-    const fd = new FormData(docForm);
-    const data = Object.fromEntries(fd.entries());
+ docForm.onsubmit = async (e) => {
+  e.preventDefault();
+  const fd = new FormData(docForm);
+  const data = Object.fromEntries(fd.entries());
 
-    // числовые
-    if ("quantity" in data) data.quantity = parseInt(data.quantity || "0", 10);
+  // гарантируем storageId из preset
+  const sidRaw = data.storageId ?? preset.storageId ?? preset.storageID;
+  if (!sidRaw) { showToast("Не задан склад"); return; }
+  data.storageId = parseInt(String(sidRaw), 10);
 
-    // валидация по схеме
-    for (const f of def.fields) {
-      if (f.required && !String(data[f.name] ?? "").trim()) {
-        showToast(`Заполните поле: ${f.label}`);
-        return;
-      }
-    }
-    if ("quantity" in data && (!Number.isFinite(data.quantity) || data.quantity <= 0)) {
-      showToast("Некорректное количество");
-      return;
-    }
+  if ("componentId" in data) data.componentId = parseInt(String(data.componentId || "0"), 10);
+  if ("quantity" in data)    data.quantity    = parseInt(String(data.quantity || "0"), 10);
 
-    try {
-      const r = await fetch(`/api/document?type=${def.kind}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!r.ok) throw 0;
-      closeDoc();
-      onSuccess && onSuccess();
-      showToast("Документ проведён", "success");
-    } catch {
-      showToast("Ошибка проведения");
-    }
-  };
+  // базовая валидация
+  if (!Number.isFinite(data.quantity) || data.quantity <= 0) { showToast("Некорректное количество"); return; }
+  if (!Number.isFinite(data.componentId) || data.componentId <= 0) { showToast("Выберите ТМЦ"); return; }
+
+  try {
+    const r = await fetch(`/api/document?type=${def.kind}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!r.ok) throw 0;
+    closeDoc();
+    onSuccess && onSuccess();
+    showToast("Документ проведён", "success");
+  } catch {
+    showToast("Ошибка проведения");
+  }
+};
+
 
   openDocModal();
 }
