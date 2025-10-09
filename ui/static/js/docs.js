@@ -50,6 +50,17 @@ const DOCS = {
   // },
 };
 
+const TYPE_RU = {
+  buy: 'Покупка',
+  sale: 'Продажа',
+  send: 'Отправка',
+  receive: 'Приёмка',
+  writeoff: 'Списание',
+  output: 'Выпуск',
+};
+const toRuType = t => TYPE_RU[t] || t;
+
+
 /* =========================
    МОДАЛКА ДОКУМЕНТА
    ========================= */
@@ -83,18 +94,32 @@ function ensureDocModal() {
     if (!docModal.classList.contains("hidden") && e.key === "Escape") closeDoc();
   });
 }
+let _prevFocus = null;
+
 function openDocModal() {
   docModal.classList.remove("hidden");
   docModal.setAttribute("aria-hidden","false");
+  _prevFocus = document.activeElement;           // запомним
   document.body.style.overflow = "hidden";
+  // фокус на первое доступное поле/кнопку
+  const firstFocusable = docForm.querySelector("input,select,textarea,button") || docModal.querySelector("#doc-cancel");
+  firstFocusable?.focus();
 }
+
 function closeDoc() {
   if (!docModal) return;
+  // убираем фокус из модалки перед скрытием
+  if (docModal.contains(document.activeElement)) {
+    document.activeElement.blur();
+  }
   docModal.classList.add("hidden");
   docModal.setAttribute("aria-hidden","true");
   document.body.style.overflow = "";
   docForm?.reset();
+  // возвращаем фокус туда, откуда пришли
+  _prevFocus?.focus?.();
 }
+
 
 /* =========================
    МОДАЛКА СПИСКА ДОКУМЕНТОВ
@@ -104,15 +129,22 @@ function ensureListModal() {
   if (listModal) return;
   const html = `
     <div id="doc-list-modal" class="modal hidden" aria-hidden="true" role="dialog" aria-modal="true">
-      <div class="modal-content" role="document">
-        <h3 class="mb-4">Документы</h3>
-        <div class="table-wrap">
+      <div class="modal-content" role="document" style="display:flex;flex-direction:column;max-height:80vh;">
+        <h3 class="mb-4" style="flex:0 0 auto;">Документы</h3>
+
+        <!-- ПРОКРУТКА ТУТ -->
+        <div id="doc-list-scroll" class="table-wrap" 
+             style="flex:1 1 auto; overflow:auto; min-height:0;">
           <table class="table">
-            <thead><tr><th>ID</th><th>Тип</th><th>Дата</th></tr></thead>
+            <thead>
+              <tr><th>ID</th><th>Тип</th><th>Дата</th></tr>
+            </thead>
             <tbody id="doc-list-body"></tbody>
           </table>
         </div>
-        <div class="flex justify-end mt-4">
+
+        <!-- ФУТЕР ВСЕГДА ВВЕРХУ ЭКРАНА -->
+        <div class="flex justify-end mt-4" style="flex:0 0 auto;">
           <button type="button" class="btn" id="doc-list-close">Закрыть</button>
         </div>
       </div>
@@ -121,6 +153,7 @@ function ensureListModal() {
   wrap.innerHTML = html;
   listModal = wrap.firstElementChild;
   document.body.appendChild(listModal);
+
   listBody  = listModal.querySelector("#doc-list-body");
   listClose = listModal.querySelector("#doc-list-close");
   listClose.addEventListener("click", () => {
@@ -128,7 +161,15 @@ function ensureListModal() {
     listModal.setAttribute("aria-hidden","true");
     document.body.style.overflow = "";
   });
+
+  // ESC для закрытия
+  window.addEventListener("keydown", e => {
+    if (!listModal.classList.contains("hidden") && e.key === "Escape") {
+      listClose.click();
+    }
+  });
 }
+
 function openListModal() {
   listModal.classList.remove("hidden");
   listModal.setAttribute("aria-hidden","false");
@@ -393,24 +434,31 @@ export async function openDocView(id) {
   try {
     const res = await fetch(`/api/document?id=${id}`);
     if (!res.ok) throw 0;
-    const doc = await res.json(); // {ID,Type,CreatedAt,CreatedBy,StorageID,Items:[{Component:{ID,Name},Quantity}],Notes,...}
 
-    const def = DOCS[doc.Type] || { title: doc.Type, fields: [] };
-    docTitle.textContent = def.title;
+    // НОРМАЛИЗАЦИЯ: массив -> объект
+    const raw = await res.json();
+    const doc = Array.isArray(raw) ? (raw[0] || {}) : (raw || {});
+
+    // найти схему по kind (buy/sale), а не по ключу объекта
+    const def = Object.values(DOCS).find(d => d.kind === doc.Type) 
+             || { title: doc.Type, fields: [] };
+
+    docTitle.textContent = def.title || doc.Type;
 
     docMeta.innerHTML = `
-      <div>ID: <strong>${doc.ID}</strong></div>
-      <div>Тип: <strong>${doc.Type}</strong></div>
+      <div>ID: <strong>${doc.ID ?? "-"}</strong></div>
+      <div>Тип: <strong>${doc.Type ?? "-"}</strong></div>
       <div>Создал: <strong>${doc.CreatedBy ?? "-"}</strong></div>
-      <div>Дата: <strong>${new Date(doc.CreatedAt).toLocaleString("ru-RU")}</strong></div>
+      <div>Дата: <strong>${doc.CreatedAt ? new Date(doc.CreatedAt).toLocaleString("ru-RU") : "-"}</strong></div>
     `;
 
-    // собрать форму по схеме и заполнить
+    // собрать форму и заполнить
     const inner = (def.fields || []).map(renderField).join("");
-    docForm.innerHTML = inner; // заметки — отдельным полем в схеме
+    docForm.innerHTML = inner;
+
     const item = Array.isArray(doc.Items) ? doc.Items[0] : null;
 
-    // наполнение селектов
+    // наполнить селекты
     for (const f of def.fields || []) {
       if (f.type !== "select") continue;
       const el = docForm.querySelector(`#fld-${f.name}`);
@@ -427,7 +475,7 @@ export async function openDocView(id) {
       }
     }
 
-    // значения
+    // проставить значения (если есть)
     for (const f of def.fields || []) {
       const el = docForm.querySelector(`#fld-${f.name}`);
       if (!el) continue;
@@ -440,7 +488,7 @@ export async function openDocView(id) {
       if (f.name === "notes")          el.value = String(doc.Notes ?? "");
     }
 
-    // read-only
+    // режим просмотра
     Array.from(docForm.elements).forEach(el => el.disabled = true);
     docSubmit.classList.add("hidden");
 
@@ -449,6 +497,7 @@ export async function openDocView(id) {
     showToast("Не удалось загрузить документ");
   }
 }
+
 
 /* =========================
    СПИСОК ДОКУМЕНТОВ
@@ -473,7 +522,7 @@ export async function openDocList({ storageId, type } = {}) {
         const tr = document.createElement("tr");
         tr.innerHTML = `
           <td>${d.ID}</td>
-          <td>${d.Type}</td>
+          <td>${toRuType(d.Type)}</td>
           <td>${new Date(d.CreatedAt).toLocaleString("ru-RU")}</td>
         `;
         tr.style.cursor = "pointer";
