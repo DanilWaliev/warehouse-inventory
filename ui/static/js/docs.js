@@ -513,7 +513,15 @@ export async function openDocList({ storageId, type } = {}) {
 
   try {
     const res = await fetch(url);
-    if (!res.ok) throw 0;
+    if (!res.ok) {
+      if (res.status == 404) {
+        listBody.innerHTML = `<tr><td colspan="3" class="text-muted">Нет документов</td></tr>`;
+        openListModal();
+      } else {
+        showToast("Не удалось загрузить список документов 1");
+      }
+      return
+    }
     const data = await res.json(); // [{ID,Type,CreatedAt}, ...]
     if (!Array.isArray(data) || data.length === 0) {
       listBody.innerHTML = `<tr><td colspan="3" class="text-muted">Нет документов</td></tr>`;
@@ -535,6 +543,6 @@ export async function openDocList({ storageId, type } = {}) {
     }
     openListModal();
   } catch {
-    showToast("Не удалось загрузить список документов");
+    showToast("Не удалось загрузить список документов 1");
   }
 }

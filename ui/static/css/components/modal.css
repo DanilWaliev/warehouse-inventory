@@ -31,3 +31,52 @@
 
 /* Кнопки действий в модалке — чтобы был отступ между ними */
 .modal .flex.justify-end .btn + .btn { margin-left: var(--spacing-2); }
+
+/* ====== Docs modal layout ====== */
+#doc-modal .modal-content {
+  max-width: 680px;              /* чуть шире, чтобы поля не ломались */
+}
+
+#doc-meta {
+  font-size: var(--font-size-sm);
+}
+
+/* Сетка формы: 2 колонки — label | control */
+#doc-form {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  column-gap: var(--spacing-4);
+  row-gap: var(--spacing-3);
+  align-items: center;            /* вертикальное выравнивание по центру */
+}
+
+/* Хитрость: обёртки .mb-3 “растворяем”, чтобы label и control стали соседями в сетке */
+#doc-form .mb-3 {
+  display: contents;
+}
+
+/* Лейблы справа, чтобы ровно “прилипали” к полям */
+#doc-form label {
+  justify-self: end;
+  white-space: nowrap;
+  color: var(--color-text);
+}
+
+/* Элементы формы занимают всю правую колонку */
+#doc-form input[type="number"],
+#doc-form input[type="text"],
+#doc-form select,
+#doc-form textarea {
+  width: 100%;
+}
+
+/* Текстовое поле повыше и выравнивание по началу строки, а не по центру */
+#doc-form textarea {
+  min-height: 96px;
+  align-self: start;
+}
+
+/* Подвал с кнопками подальше от полей */
+#doc-modal .modal-content .flex.justify-end {
+  margin-top: var(--spacing-4);
+}
