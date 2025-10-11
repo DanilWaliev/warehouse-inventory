@@ -12,6 +12,7 @@
 @import 'pages/signin.css';
 @import 'pages/production.css';
 @import 'pages/inventory.css';
+@import 'pages/movement.css';
 
 /* Импорт стилей для отдельных компонентов страницы */
 @import 'components/header.css';
