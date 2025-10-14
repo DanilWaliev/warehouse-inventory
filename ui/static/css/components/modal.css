@@ -80,3 +80,74 @@
 #doc-modal .modal-content .flex.justify-end {
   margin-top: var(--spacing-4);
 }
+
+/* Только модалка создания заказа перемещения */
+#modal-move-create .modal-content {
+  width: 960px;          /* фиксированная ширина */
+  max-width: 960px;      /* не ужимать меньше на десктопе */
+  /* чтобы кнопки не уезжали вниз за экран, а контент прокручивался внутри */
+  max-height: calc(100vh - 10vh);
+  overflow: auto;
+}
+
+/* Небольшая адаптация для узких экранов, чтобы не вылезало за границы */
+@media (max-width: 1024px) {
+  #modal-move-create .modal-content {
+    width: 92vw;
+    max-width: 92vw;
+  }
+}
+
+/* === Транзитные склады и Маршруты: фиксированная ширина и прокрутка === */
+#modal-transit-create .modal-content,
+#modal-route-create .modal-content {
+  width: 720px;         /* фиксируем ширину */
+  max-width: 720px;
+  max-height: calc(100vh - 10vh);
+  overflow: auto;       /* скролл внутри, кнопки видны */
+}
+
+/* Выравнивание полей по вертикали: label слева, инпут справа в одну линию */
+#modal-transit-create .modal-content form .mb-4,
+#modal-route-create   .modal-content form .mb-4 {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+}
+
+/* Фиксированная ширина подписей, поля тянутся */
+#modal-transit-create label,
+#modal-route-create   label {
+  flex: 0 0 220px;  /* одинаковая колонка под подписи */
+}
+
+#modal-transit-create input,
+#modal-transit-create select,
+#modal-transit-create textarea,
+#modal-route-create   input,
+#modal-route-create   select,
+#modal-route-create   textarea {
+  flex: 1 1 auto;   /* поля растягиваются */
+}
+
+/* Мелкая адаптация под узкие экраны */
+@media (max-width: 1024px) {
+  #modal-transit-create .modal-content,
+  #modal-route-create   .modal-content {
+    width: 92vw;
+    max-width: 92vw;
+  }
+}
+
+@media (max-width: 640px) {
+  #modal-transit-create .modal-content form .mb-4,
+  #modal-route-create   .modal-content form .mb-4 {
+    display: block;              /* в столбик на очень узких */
+  }
+  #modal-transit-create label,
+  #modal-route-create   label {
+    flex: none;
+    display: block;
+    margin-bottom: var(--spacing-2);
+  }
+}

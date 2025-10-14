@@ -6,9 +6,6 @@
   import { showConfirm } from "../../confirm.js";
   import { initWarehouses } from "./warehouses.js";
 
-
-  // TODO: разобраться с модулями
-
   (async function bootstrap() {
     // DOM: основные элементы
     const sidebar = document.querySelector('.sidebar');

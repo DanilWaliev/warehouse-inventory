@@ -25,9 +25,10 @@
           <table class="table" id="table-move">
             <thead>
               <tr>
-                <th style="width:8ch;">ID заказа</th>
-                <th style="width:10ch;">ID маршрута</th>
+                <th style="width:12ch;">ID заказа</th>
+                <th style="width:12ch;">ID маршрута</th>
                 <th style="width:12ch;">ID транзита</th>
+                <th style="width:12ch">Партии</th>
                 <th style="width:22ch;">Статус</th>
                 <th>Создан</th>
                 <th>Завершён</th>
@@ -97,43 +98,116 @@
 
   </div><!-- /grid -->
 
-  <!-- МОДАЛЫ (пустые формы; наполняй через JS) -->
-
   <!-- Создать заказ перемещения -->
   <div id="modal-move-create" class="modal hidden" aria-hidden="true">
-    <div class="modal-content">
-      <h3>Создать заказ перемещения</h3>
-      <form id="form-move-create">
-        <div class="mb-4">
-          <label>Маршрут</label>
-          <select name="route_id" id="move-route" required></select>
-        </div>
+    <div class="modal-content" style="max-width:900px">
+      <h3 class="mb-4">Создать заказ перемещения</h3>
 
-        <div class="mb-4">
-          <label>Элементы (рецептура и количество)</label>
-          <div id="move-items-list"></div>
-          <div class="mt-2">
-            <button type="button" class="btn" data-action="add-move-item">+ Добавить позицию</button>
+      <!-- Двухколоночный блок: слева Отправитель, справа Получатель -->
+      <div class="mb-4" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:start;">
+        <!-- Отправитель -->
+        <div>
+          <div class="mb-3" style="display:flex;flex-direction:column;gap:6px;">
+            <label class="text-muted">Отправитель (склад)</label>
+            <select id="move-from" name="from_id" required></select>
           </div>
         </div>
 
-        <div class="flex justify-end gap-2">
-          <button type="button" class="btn" data-close-modal>Отмена</button>
-          <button type="submit" class="btn btn-primary">Создать</button>
+        <!-- Получатель -->
+        <div>
+          <div class="mb-3" style="display:flex;flex-direction:column;gap:6px;">
+            <label class="text-muted">Получатель (склад)</label>
+            <select id="move-to" name="to_id" required></select>
+          </div>
         </div>
-      </form>
+      </div>
+
+      <!-- Информация о маршруте (заполняется автоматически) -->
+      <div id="move-route-info" class="mb-4"
+           style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;">
+        <div><strong>Маршрут:</strong> <span id="move-route-name" class="text-muted">—</span></div>
+        <div><strong>Транзит:</strong> <span id="move-route-transit" class="text-muted">—</span></div>
+        <div><strong>Оценка времени:</strong> <span id="move-route-eta" class="text-muted">—</span></div>
+      </div>
+
+      <!-- Позиции заказа (компонент + количество) -->
+      <div class="card p-4">
+        <h4 class="mb-3" style="display:flex;align-items:center;justify-content:space-between;">
+          Позиции
+          <button type="button" class="btn btn-primary" id="move-add-item" title="Добавить позицию">＋</button>
+        </h4>
+
+        <div class="table-wrap">
+          <table class="table" id="move-items-table">
+            <thead>
+              <tr>
+                <th style="width:60%;">ТМЦ</th>
+                <th style="width:30%;">Количество</th>
+                <th style="width:10%;">Действия</th>
+              </tr>
+            </thead>
+            <tbody id="move-items-body">
+              <!-- строки добавляются скриптом -->
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-2 text-muted" id="move-items-empty">Добавьте хотя бы одну позицию</div>
+      </div>
+
+      <!-- Заметки -->
+      <div class="mb-4" style="display:flex;flex-direction:column;gap:6px;">
+        <label class="text-muted">Заметки</label>
+        <textarea id="move-notes" class="w-full" rows="3" placeholder="Необязательно"></textarea>
+      </div>
+
+      <!-- Управление -->
+      <div class="flex justify-end" style="gap:8px">
+        <button type="button" class="btn" data-close-modal>Отмена</button>
+        <button type="button" class="btn btn-primary" id="move-submit">Создать</button>
+      </div>
+
+      <!-- скрытые поля -->
+      <input type="hidden" id="move-route-id" value="">
     </div>
   </div>
+
 
   <!-- Создать маршрут -->
   <div id="modal-route-create" class="modal hidden" aria-hidden="true">
     <div class="modal-content">
       <h3>Создать маршрут</h3>
-      <form id="form-route-create">
-        <div class="mb-4"><label>Название</label><input name="name" required></div>
-        <div class="mb-4"><label>Откуда (склад)</label><select name="from_id" id="route-from" required></select></div>
-        <div class="mb-4"><label>Куда (склад)</label><select name="to_id" id="route-to" required></select></div>
-        <div class="mb-4"><label>Транзит (опционально)</label><select name="transit_id" id="route-transit"><option value="">— нет —</option></select></div>
+      <form method="post" action="/route/create">
+        <div class="mb-4">
+          <label>Название</label>
+          <input name="name" required>
+        </div>
+
+        <div class="mb-4">
+          <label>Откуда (склад)</label>
+          <select name="from_id" required>
+            <!-- заполни через fetch -->
+          </select>
+        </div>
+
+        <div class="mb-4">
+          <label>Куда (склад)</label>
+          <select name="to_id" required>
+            <!-- заполни через fetch -->
+          </select>
+        </div>
+
+        <div class="mb-4">
+          <label>Транзитный склад</label>
+          <select name="transit_id" required>
+            <!-- заполни через fetch -->
+          </select>
+        </div>
+
+        <div class="mb-4">
+          <label>Предполагаемое время (ч)</label>
+          <input type="number" name="estimated_hours" min="1" step="1" required>
+        </div>
+
         <div class="flex justify-end gap-2">
           <button type="button" class="btn" data-close-modal>Отмена</button>
           <button type="submit" class="btn btn-primary">Создать</button>
@@ -146,19 +220,27 @@
   <div id="modal-transit-create" class="modal hidden" aria-hidden="true">
     <div class="modal-content">
       <h3>Создать транзитный склад</h3>
-      <form id="form-transit-create">
-        <div class="mb-4"><label>Название</label><input name="name" required></div>
+      <form method="post" action="/transit/create">
         <div class="mb-4">
-          <label>Тип</label>
-          <select name="transport_type" id="transit-type" required>
-            <option value="air">Воздушный</option>
-            <option value="rail">Ж/д</option>
-            <option value="road">Авто</option>
-            <option value="sea">Морской</option>
-          </select>
+          <label>Название</label>
+          <input name="name" required>
         </div>
-        <div class="mb-4"><label>Вместимость</label><input name="capacity" type="number" min="0" step="0.01" required></div>
-        <div class="mb-4"><label>Примечание / адрес</label><input name="note"></div>
+
+        <div class="mb-4">
+          <label>Вместимость (кг)</label>
+          <input type="number" name="capacity" min="0" step="0.01" required>
+        </div>
+
+        <div class="mb-4">
+          <label>Локация (необязательно)</label>
+          <input name="location" placeholder="Адрес, город...">
+        </div>
+
+        <div class="mb-4">
+          <label>Заметки (необязательно)</label>
+          <textarea name="note" class="w-full" rows="3" placeholder=""></textarea>
+        </div>
+
         <div class="flex justify-end gap-2">
           <button type="button" class="btn" data-close-modal>Отмена</button>
           <button type="submit" class="btn btn-primary">Создать</button>
@@ -168,4 +250,5 @@
   </div>
 
 </section>
+<script type="module" src="/static/js/pages/movement/main.js"></script>
 {{end}}
