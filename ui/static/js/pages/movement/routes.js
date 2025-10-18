@@ -8,45 +8,61 @@ export function initRoutes({ showToast, showConfirm }) {
 
   let editingId = null;
 
-  // ====== FETCH helpers с единым обработчиком ошибок ======
-  async function parseOrToast(res, contextMsgDefault) {
-    if (!res.ok) {
-      switch (res.status) {
-        case 409:
-          showToast?.("Маршрут уже существует");
-          break;
-        case 400:
-          showToast?.("Некорректные данные");
-          break;
-        default:
-          showToast?.(contextMsgDefault || "Ошибка при обработке запроса");
-      }
-      return null;
+  // ====== TOAST helper (единый текст для не-404 ошибок) ======
+  function toastByStatus(res, fallback) {
+    switch (res.status) {
+      case 409:
+        showToast?.("ТМЦ уже существует");
+        break;
+      case 400:
+        showToast?.("Некорректные данные");
+        break;
+      default:
+        showToast?.(fallback);
     }
-    // на успешный GET парсим json, на успешный мутационный запрос просто вернём true
-    const ct = res.headers.get('Content-Type') || '';
-    if (ct.includes('application/json')) return await res.json();
-    return true;
   }
 
+  // ====== LIST GET (Маршруты/Склады/Транзиты) ======
+  async function parseListGET(res, fallbackToast) {
+    if (res.status === 404) return []; // тихо: пусто без тоста
+    if (!res.ok) {
+      toastByStatus(res, fallbackToast);
+      return [];
+    }
+    const ct = res.headers.get('Content-Type') || '';
+    return ct.includes('application/json') ? await res.json() : [];
+  }
+
+  // ====== ONE GET / MUTATIONS ======
+  async function parseOrToast(res, fallbackToast) {
+    if (!res.ok) {
+      // тут 404 тоже кидаем тост (для fetchOne/edit)
+      toastByStatus(res, fallbackToast);
+      return null;
+    }
+    const ct = res.headers.get('Content-Type') || '';
+    return ct.includes('application/json') ? await res.json() : true;
+  }
+
+  // ====== API ======
   async function fetchList() {
     const res = await fetch('/api/route');
-    return parseOrToast(res, "Ошибка загрузки маршрутов");
+    return parseListGET(res, "Ошибка загрузки маршрутов");
   }
 
   async function fetchStorages() {
     const res = await fetch('/api/storage?type=warehouse&inventory=false');
-    return parseOrToast(res, "Ошибка загрузки складов");
+    return parseListGET(res, "Ошибка загрузки складов");
   }
 
   async function fetchTransits() {
     const res = await fetch('/api/storage?type=transit&inventory=false');
-    return parseOrToast(res, "Ошибка загрузки транзитных складов");
+    return parseListGET(res, "Ошибка загрузки транзитных складов");
   }
 
   async function fetchOne(id) {
     const res = await fetch(`/api/route?id=${id}`);
-    return parseOrToast(res, "Ошибка загрузки маршрута");
+    return parseOrToast(res, "Маршрут не найден");
   }
 
   async function createRoute(payload) {
@@ -71,15 +87,14 @@ export function initRoutes({ showToast, showConfirm }) {
     const res = await fetch(`/api/route?id=${id}`, { method: 'DELETE' });
     return parseOrToast(res, "Ошибка при удалении маршрута");
   }
-  // ====== /FETCH helpers ======
 
+  // ====== RENDER ======
   async function load() {
     if (!tbody) return;
     tbody.innerHTML = '';
     try {
-      const data = await fetchList();
-      if (!Array.isArray(data)) return; // ошибка уже показана
-      if (data.length === 0) {
+      const data = await fetchList(); // [] при 404 без тоста
+      if (!Array.isArray(data) || data.length === 0) {
         tbody.innerHTML = `<tr><td colspan="6" class="text-muted">Нет маршрутов</td></tr>`;
         return;
       }
@@ -100,14 +115,15 @@ export function initRoutes({ showToast, showConfirm }) {
         tr.querySelector('.btn-delete')?.addEventListener('click', async () => {
           if (!(await showConfirm?.('Удалить маршрут?', 'Подтверждение'))) return;
           const ok = await deleteRoute(r.ID);
-          if (!ok) return; // ошибка уже показана
+          if (!ok) return;
           await load();
           showToast?.('Маршрут удалён', 'success');
         });
         tbody.appendChild(tr);
       });
     } catch {
-      showToast?.('Ошибка загрузки маршрутов');
+      // Сетевые фейлы — покажем «пусто» (без тоста для списка)
+      tbody.innerHTML = `<tr><td colspan="6" class="text-muted">Нет маршрутов</td></tr>`;
     }
   }
 
@@ -123,7 +139,7 @@ export function initRoutes({ showToast, showConfirm }) {
   async function openEdit(id) {
     try {
       const [route] = await Promise.all([fetchOne(id), fillForm()]);
-      if (!route) return; // ошибка уже показана
+      if (!route) return; // тост уже показан при !ok
       editingId = id;
       if (title) title.textContent = 'Изменить маршрут';
       form.elements['name'].value        = route.Name || '';
@@ -140,28 +156,28 @@ export function initRoutes({ showToast, showConfirm }) {
   async function fillForm() {
     if (!form) return;
     const [warehouses, transits] = await Promise.all([fetchStorages(), fetchTransits()]);
-    // если какой-то из запросов вернул null — ошибки уже показаны
     const fromSel = form.elements['from_id'];
     const toSel   = form.elements['to_id'];
     const trSel   = form.elements['transit_id'];
 
-    if (fromSel && Array.isArray(warehouses)) {
-      fromSel.innerHTML = warehouses.map(w =>
-        `<option value="${w.ID}">${w.Name}${w.Location ? ' — ' + w.Location : ''}</option>`
-      ).join('');
+    if (fromSel) {
+      fromSel.innerHTML = (Array.isArray(warehouses) && warehouses.length)
+        ? warehouses.map(w => `<option value="${w.ID}">${w.Name}${w.Location ? ' — ' + w.Location : ''}</option>`).join('')
+        : `<option value="">— нет складов —</option>`;
     }
-    if (toSel && Array.isArray(warehouses)) {
-      toSel.innerHTML = warehouses.map(w =>
-        `<option value="${w.ID}">${w.Name}${w.Location ? ' — ' + w.Location : ''}</option>`
-      ).join('');
+    if (toSel) {
+      toSel.innerHTML = (Array.isArray(warehouses) && warehouses.length)
+        ? warehouses.map(w => `<option value="${w.ID}">${w.Name}${w.Location ? ' — ' + w.Location : ''}</option>`).join('')
+        : `<option value="">— нет складов —</option>`;
     }
-    if (trSel && Array.isArray(transits)) {
-      trSel.innerHTML = transits.map(t =>
-        `<option value="${t.ID}">${t.Name}${t.Location ? ' — ' + t.Location : ''}</option>`
-      ).join('');
+    if (trSel) {
+      trSel.innerHTML = (Array.isArray(transits) && transits.length)
+        ? transits.map(t => `<option value="${t.ID}">${t.Name}${t.Location ? ' — ' + t.Location : ''}</option>`).join('')
+        : `<option value="">— нет транзитных —</option>`;
     }
   }
 
+  // ====== MODAL ======
   function showModal() {
     if (!modal) return;
     modal.classList.remove('hidden');
@@ -177,6 +193,7 @@ export function initRoutes({ showToast, showConfirm }) {
     editingId = null;
   }
 
+  // ====== SUBMIT ======
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(form);
@@ -192,16 +209,12 @@ export function initRoutes({ showToast, showConfirm }) {
     }
 
     if (editingId) {
-      const ok = await updateRoute(editingId, {
-        name, fromId, toId, transitId: trId, etaHours: eta,
-      });
-      if (!ok) return; // ошибка уже показана
+      const ok = await updateRoute(editingId, { name, fromId, toId, transitId: trId, etaHours: eta });
+      if (!ok) return;
       showToast?.('Маршрут обновлён', 'success');
     } else {
-      const ok = await createRoute({
-        name, fromId, toId, transitId: trId, etaHours: eta,
-      });
-      if (!ok) return; // ошибка уже показана
+      const ok = await createRoute({ name, fromId, toId, transitId: trId, etaHours: eta });
+      if (!ok) return;
       showToast?.('Маршрут создан', 'success');
     }
 

@@ -5,8 +5,9 @@ import { updateHeaderOffset } from "../inventory/utils.js";
 import { showToast } from "../../toast.js";
 import { showConfirm } from "../../confirm.js";
 
-// Подключаем модуль маршрутов
 import { initRoutes } from "./routes.js";
+import { initOrders } from "./orders.js";
+import { initTransits } from "./transits.js";
 
 (function bootstrap() {
   // ===== DOM =====
@@ -22,10 +23,8 @@ import { initRoutes } from "./routes.js";
   // ===== Инициализация модулей таблиц =====
   // routes.js управляет своей модалкой и таблицей (#table-routes-body, #form-route-create, #modal-route-create)
   const routes = initRoutes({ showToast, showConfirm });
-
-  // Заглушки: позже добавишь реальные модули
-  const moves   = { load: async () => {} };
-  const transits= { load: async () => {} };
+  const orders = initOrders({ showToast, showConfirm });
+  const transits = initTransits({ showToast, showConfirm });
 
   // ===== Хелперы общих модалок (оставляем на будущее) =====
   function openModal(modalEl) {
@@ -101,9 +100,8 @@ import { initRoutes } from "./routes.js";
   // ===== Первичная загрузка таблиц =====
   // Список маршрутов грузит модуль routes
   routes.load();
-  // Остальное подключишь позже
-  // moves.load();
-  // transits.load();
+  orders.load();
+  transits.load();
 
   // ===== Хуки пред-открытия (для немодульных форм) =====
   function resetMoveCreate(modalEl) {
