@@ -65,7 +65,19 @@ func (s *DocumentService) ReadByStorages(storages []int) ([]*models.Document, er
 }
 
 func (s *DocumentService) Create(doc *models.Document) error {
-	return s.documentModel.Insert(doc)
+	var err error
+	switch doc.Type {
+	case "buy":
+		_, err = s.documentModel.InsertBuy(doc)
+	case "sale":
+		_, err = s.documentModel.InsertSale(doc)
+		//TODO: закончить
+	case "productionCreate":
+		//_, err = s.documentModel.InsertProductionCreate(doc, )
+	case "productionFinish":
+		//_, err = s.documentModel.InsertProductionFinish(doc)
+	}
+	return err
 }
 
 func (s *DocumentService) Delete(id int) error {
