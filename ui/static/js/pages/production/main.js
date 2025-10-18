@@ -1,11 +1,11 @@
 // main.js (точка входа для production, type="module")
-import { resolveToastConfirm, updateHeaderOffset } from "./utils.js";
 import { initRecipes } from "./recipes.js";
 import { initOrders } from "./orders.js";
+import { updateHeaderOffset } from "./utils.js";
+import { showToast } from "../../toast.js"
+import { showConfirm } from "../../confirm.js";
 
 (async function bootstrap() {
-  const { showToast, showConfirm } = await resolveToastConfirm();
-
   // DOM: основные элементы
   const sidebar = document.querySelector('.sidebar');
   const tabs = document.querySelectorAll('.sidebar li');
