@@ -6,25 +6,25 @@ import (
 	"warehouse-inventory/pkg/models"
 )
 
-type OrderModel struct {
+type ProductionOrderModel struct {
 	DB *sql.DB
 }
 
-func NewOrderModel(db *sql.DB) *OrderModel {
-	return &OrderModel{
+func NewProductionOrderModel(db *sql.DB) *ProductionOrderModel {
+	return &ProductionOrderModel{
 		DB: db,
 	}
 }
 
-// Получить заказ по ID
-func (m *OrderModel) SelectByID(id int, rm *RecipeModel) (*models.Order, error) {
+// Получить производственный заказ по ID
+func (m *ProductionOrderModel) SelectByID(id int, rm *RecipeModel) (*models.ProductionOrder, error) {
 	stmt := `SELECT ProductionOrder_ID, CreatedAt, ClosedAt
 	         FROM productionorder
 	         WHERE ProductionOrder_ID = ? AND ProductionSite_StorageSite_ID = 1`
 
 	row := m.DB.QueryRow(stmt, id)
 
-	o := &models.Order{}
+	o := &models.ProductionOrder{}
 	var closedAt sql.NullTime
 
 	err := row.Scan(&o.ID, &o.CreatedAt, &closedAt)
@@ -60,7 +60,7 @@ func (m *OrderModel) SelectByID(id int, rm *RecipeModel) (*models.Order, error) 
 			return nil, err
 		}
 
-		o.Items = append(o.Items, models.OrderItem{
+		o.Items = append(o.Items, models.ProductionOrderItem{
 			Recipe:   *recipe,
 			Quantity: qty,
 		})
@@ -73,8 +73,8 @@ func (m *OrderModel) SelectByID(id int, rm *RecipeModel) (*models.Order, error) 
 	return o, nil
 }
 
-// Получить все заказы
-func (m *OrderModel) SelectAll(rm *RecipeModel) ([]*models.Order, error) {
+// Получить все производственные заказы
+func (m *ProductionOrderModel) SelectAll(rm *RecipeModel) ([]*models.ProductionOrder, error) {
 	stmt := `SELECT ProductionOrder_ID, CreatedAt, ClosedAt
 	         FROM productionorder
 	         WHERE ProductionSite_StorageSite_ID = 1
@@ -86,10 +86,10 @@ func (m *OrderModel) SelectAll(rm *RecipeModel) ([]*models.Order, error) {
 	}
 	defer rows.Close()
 
-	var orders []*models.Order
+	var productionOrders []*models.ProductionOrder
 
 	for rows.Next() {
-		o := &models.Order{}
+		o := &models.ProductionOrder{}
 		var closedAt sql.NullTime
 
 		if err := rows.Scan(&o.ID, &o.CreatedAt, &closedAt); err != nil {
@@ -122,24 +122,24 @@ func (m *OrderModel) SelectAll(rm *RecipeModel) ([]*models.Order, error) {
 				return nil, err
 			}
 
-			o.Items = append(o.Items, models.OrderItem{
+			o.Items = append(o.Items, models.ProductionOrderItem{
 				Recipe:   *recipe,
 				Quantity: qty,
 			})
 		}
 		itemRows.Close()
 
-		orders = append(orders, o)
+		productionOrders = append(productionOrders, o)
 	}
 
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
-	return orders, nil
+	return productionOrders, nil
 }
 
-func (m *OrderModel) Insert(order *models.Order) error {
+func (m *ProductionOrderModel) Insert(order *models.ProductionOrder) error {
 	// начинаем транзакцию
 	tx, err := m.DB.Begin()
 	if err != nil {
@@ -178,14 +178,14 @@ func (m *OrderModel) Insert(order *models.Order) error {
 	return nil
 }
 
-func (m *OrderModel) Delete(id int) error {
+func (m *ProductionOrderModel) Delete(id int) error {
 	stmt := `DELETE FROM productionorder WHERE ProductionOrder_ID = ? AND ProductionSite_StorageSite_ID = 1`
 	_, err := m.DB.Exec(stmt, id)
 	return err
 }
 
 // Обновление заказа (менять список нельзя, только дату закрытия)
-func (m *OrderModel) Update(id int) error {
+func (m *ProductionOrderModel) Update(id int) error {
 	stmt := `UPDATE productionorder 
 	         SET ClosedAt = CURRENT_TIMESTAMP
 	         WHERE ProductionOrder_ID = ? AND ProductionSite_StorageSite_ID = 1`

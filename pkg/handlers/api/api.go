@@ -25,7 +25,7 @@ func NewAPIHandler(helper *handlers.LogHelper, services *services.Services) *API
 		ComponentHandler: NewComponentHandler(helper, services.ComponentService),
 		RecipeHandler:    NewRecipeHandler(helper, services.RecipeService),
 		UserHandler:      NewUserHandler(helper, services.UserService),
-		OrderHandler:     NewOrderHandler(helper, services.OrderService),
+		OrderHandler:     NewOrderHandler(helper, services.ProductionOrderService),
 		StorageHandler:   NewStorageHandler(helper, services.StorageService),
 		DocumentHandler:  NewDocumentHandler(helper, services.DocumentService),
 	}

@@ -38,14 +38,14 @@ type RecipeItem struct {
 	Quantity   int
 }
 
-type Order struct {
+type ProductionOrder struct {
 	ID        int
 	CreatedAt *time.Time
 	ClosedAt  *time.Time
-	Items     []OrderItem
+	Items     []ProductionOrderItem
 }
 
-type OrderItem struct {
+type ProductionOrderItem struct {
 	Recipe   Recipe
 	Quantity int
 }

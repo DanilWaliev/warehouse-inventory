@@ -13,10 +13,10 @@ import (
 
 type OrderHandler struct {
 	Helper       *handlers.LogHelper
-	OrderService *services.OrderService
+	OrderService *services.ProductionOrderService
 }
 
-func NewOrderHandler(helper *handlers.LogHelper, orderService *services.OrderService) *OrderHandler {
+func NewOrderHandler(helper *handlers.LogHelper, orderService *services.ProductionOrderService) *OrderHandler {
 	return &OrderHandler{
 		Helper:       helper,
 		OrderService: orderService,
@@ -36,7 +36,7 @@ func (h *OrderHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var (
-		orders []*models.Order
+		orders []*models.ProductionOrder
 		err    error
 	)
 
@@ -84,7 +84,7 @@ func (h *OrderHandler) Post(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Маппим в модель
-	o := &models.Order{}
+	o := &models.ProductionOrder{}
 
 	for _, it := range input.Items {
 		if it.RecipeComponentID == 0 || it.Quantity <= 0 {
@@ -92,7 +92,7 @@ func (h *OrderHandler) Post(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		o.Items = append(o.Items, models.OrderItem{
+		o.Items = append(o.Items, models.ProductionOrderItem{
 			Recipe: models.Recipe{Result: models.Component{
 				ID: it.RecipeComponentID,
 			}},
