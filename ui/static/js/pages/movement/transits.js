@@ -42,7 +42,7 @@ export function initTransits({ showToast, showConfirm }) {
 
   // ===== API =====
   async function fetchList() {
-    const res = await fetch('/api/storage?type=transit&inventory=false');
+    const res = await fetch('/api/storage?type=transitstorage&inventory=false');
     return parseListGET(res, "Ошибка загрузки транзитных складов");
   }
 
@@ -55,7 +55,7 @@ export function initTransits({ showToast, showConfirm }) {
     const res = await fetch('/api/storage', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'transit', ...payload }),
+      body: JSON.stringify({ type: 'transitstorage', ...payload }),
     });
     return parseOrToast(res, "Ошибка при сохранении транзитного склада");
   }
@@ -93,8 +93,9 @@ export function initTransits({ showToast, showConfirm }) {
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td class="col-id">${t.ID ?? ''}</td>
-        <td>${t.Type ?? 'transit'}</td>
-        <td>${t.CapacityKg ?? t.Capacity ?? ''}</td>
+        <td>${t.Name ?? ''}</td>
+        <td>${t.TransportType ?? ''}</td>
+        <td>${t.Capacity ?? ''}</td>
         <td>${t.Location ?? ''}</td>
         <td>${t.Note ?? ''}</td>
         <td>
@@ -174,21 +175,22 @@ export function initTransits({ showToast, showConfirm }) {
     e.preventDefault();
     const fd = new FormData(form);
     const name       = String(fd.get('name') || '').trim();
-    const capacityKg = parseFloat(String(fd.get('capacity_kg') || '0'));
+    const transportType       = String(fd.get('type') || '').trim();
+    const capacity = parseFloat(String(fd.get('capacity') || '0'));
     const location   = String(fd.get('location') || '').trim();
     const note       = String(fd.get('note') || '').trim();
 
-    if (!name || !Number.isFinite(capacityKg) || capacityKg <= 0) {
+    if (!name || !Number.isFinite(capacity) || capacity <= 0) {
       showToast?.('Заполните название и корректную вместимость (кг)');
       return;
     }
 
     if (editingId) {
-      const ok = await updateTransit(editingId, { name, capacityKg, location, note });
+      const ok = await updateTransit(editingId, { name, transportType, capacity, location, note });
       if (!ok) return; // ошибка уже показана
       showToast?.('Транзитный склад обновлён', 'success');
     } else {
-      const ok = await createTransit({ name, capacityKg, location, note });
+      const ok = await createTransit({ name, transportType, capacity, location, note });
       if (!ok) return; // ошибка уже показана
       showToast?.('Транзитный склад создан', 'success');
     }

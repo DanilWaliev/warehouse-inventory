@@ -83,8 +83,10 @@
             <thead>
               <tr>
                 <th style="width:8ch;">ID</th>
+                <th>Название</th>
                 <th>Тип</th>
                 <th>Вместимость</th>
+                <th>Заметка</th>
               </tr>
             </thead>
             <tbody id="table-transits-body">
@@ -220,10 +222,20 @@
   <div id="modal-transit-create" class="modal hidden" aria-hidden="true">
     <div class="modal-content">
       <h3>Создать транзитный склад</h3>
-      <form method="post">
+      <form id="form-transit-create">
         <div class="mb-4">
           <label>Название</label>
           <input name="name" required>
+        </div>
+
+        <div class="mb-4">
+          <label for="transit-type">Тип</label>
+          <select id="transit-type" name="type" required>
+            <option value="air">Авиа</option>
+            <option value="rail">Ж/д</option>
+            <option value="road">Авто</option>
+            <option value="sea">Морской</option>
+          </select>
         </div>
 
         <div class="mb-4">

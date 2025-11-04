@@ -3,6 +3,7 @@ package mysql
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"warehouse-inventory/pkg/models"
 )
 
@@ -265,35 +266,89 @@ func (m *StorageModel) SelectWithInventoryByType(stype string) ([]*models.Storag
 }
 
 func (m *StorageModel) SelectWithoutInventoryByType(stype string) ([]*models.Storage, error) {
-	headerStmt := `
-		SELECT s.StorageSite_ID, s.Name, s.Location, s.Type, s.Note
-		FROM storagesite s
-		WHERE s.Type = ?;
-	`
-	rows, err := m.DB.Query(headerStmt, stype)
+	var (
+		rows *sql.Rows
+		err  error
+	)
+
+	if stype == "transitstorage" {
+		// Показываем только те транзитные склады, у которых есть строка в transitstorage
+		const q = `
+			SELECT
+				s.StorageSite_ID,
+				s.Name,
+				s.Location,
+				s.Type,
+				s.Note,
+				t.TransportType,
+				t.Capacity
+			FROM storagesite s
+			INNER JOIN transitstorage t ON t.StorageSite_ID = s.StorageSite_ID
+			WHERE s.Type = 'transitstorage'
+			ORDER BY s.StorageSite_ID;
+		`
+		rows, err = m.DB.Query(q)
+	} else {
+		const q = `
+			SELECT
+				s.StorageSite_ID,
+				s.Name,
+				s.Location,
+				s.Type,
+				s.Note
+			FROM storagesite s
+			WHERE s.Type = ?
+			ORDER BY s.StorageSite_ID;
+		`
+		rows, err = m.DB.Query(q, stype)
+	}
 	if err != nil {
 		return nil, err
 	}
-
 	defer rows.Close()
 
-	var storages []*models.Storage
+	var out []*models.Storage
 
 	for rows.Next() {
 		s := &models.Storage{}
+		if stype == "transitstorage" {
+			var tt sql.NullString
+			var cap sql.NullFloat64
 
-		err := rows.Scan(&s.ID, &s.Name, &s.Location, &s.Type, &s.Note)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, models.ErrNoRecord
+			if err := rows.Scan(
+				&s.ID, &s.Name, &s.Location, &s.Type, &s.Note,
+				&tt, &cap,
+			); err != nil {
+				return nil, err
 			}
-			return nil, err
-		}
 
-		storages = append(storages, s)
+			// Если хотите жёстко требовать наличие данных:
+			if !tt.Valid || !cap.Valid {
+				return nil, fmt.Errorf("missing transitstorage row for storage_id=%d", s.ID)
+			}
+
+			// Эти поля должны существовать в вашей модели:
+			//   TransportType *string
+			//   Capacity      *float64
+			ttv := tt.String
+			cpv := cap.Float64
+			s.TransportType = &ttv
+			s.Capacity = &cpv
+
+		} else {
+			if err := rows.Scan(
+				&s.ID, &s.Name, &s.Location, &s.Type, &s.Note,
+			); err != nil {
+				return nil, err
+			}
+		}
+		out = append(out, s)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
-	return storages, nil
+	return out, nil
 }
 
 // Создание скалада
@@ -351,7 +406,7 @@ func (m *StorageModel) InsertTransitStorage(name, location, stype, transportType
 	}()
 
 	res, err := tx.Exec(
-		`INSERT INTO storagesite (Name, Type, Location, Note) VALUES (?, ?, ?. ?)`,
+		`INSERT INTO storagesite (Name, Type, Location, Note) VALUES (?, ?, ?, ?)`,
 		name, "transitstorage", location, note,
 	)
 	if err != nil {

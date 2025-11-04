@@ -51,12 +51,14 @@ type ProductionOrderItem struct {
 }
 
 type Storage struct {
-	ID        int
-	Name      string
-	Location  string
-	Type      string
-	Note      *string
-	Inventory []StorageItem
+	ID            int
+	Name          string
+	Location      string
+	Type          string
+	Note          *string
+	Inventory     []StorageItem
+	TransportType *string  // 'air','rail','road','sea'
+	Capacity      *float64 // decimal(10,2)
 }
 
 type StorageItem struct {
