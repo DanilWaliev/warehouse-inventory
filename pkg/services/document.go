@@ -73,9 +73,9 @@ func (s *DocumentService) Create(doc *models.Document) error {
 		_, err = s.documentModel.InsertSale(doc)
 		//TODO: закончить
 	case "productionCreate":
-		//_, err = s.documentModel.InsertProductionCreate(doc, )
+		_, err = s.documentModel.InsertProductionCreate(doc)
 	case "productionFinish":
-		//_, err = s.documentModel.InsertProductionFinish(doc)
+		_, err = s.documentModel.InsertProductionFinish(doc)
 	}
 	return err
 }

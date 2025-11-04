@@ -356,19 +356,7 @@ func (m *DocumentModel) Insert(d *models.Document, extra ...any) (*models.Docume
 	case "sale":
 		return m.InsertSale(d)
 	case "productionCreate":
-		// ожидаем: extra[0] = []models.ProductionOrderItem, extra[1] = *RecipeModel
-		if len(extra) < 2 {
-			return nil, errors.New("productionCreate requires orderItems []ProductionOrderItem and *RecipeModel")
-		}
-		items, ok := extra[0].([]models.ProductionOrderItem)
-		if !ok {
-			return nil, errors.New("productionCreate: extra[0] must be []models.ProductionOrderItem")
-		}
-		rm, ok := extra[1].(*RecipeModel)
-		if !ok || rm == nil {
-			return nil, errors.New("productionCreate: extra[1] must be *RecipeModel")
-		}
-		return m.InsertProductionCreate(d, items, rm)
+		return m.InsertProductionCreate(d)
 	case "productionFinish":
 		return m.InsertProductionFinish(d)
 	default:
@@ -480,27 +468,29 @@ func (m *DocumentModel) InsertSale(d *models.Document) (*models.Document, error)
 	return d, nil
 }
 
-// InsertProductionCreate — начало производства:
-// 1) создаёт productionorder,
-// 2) рассчитывает потребность в ингредиентах по рецептам (на основе orderItems),
-// 3) списывает ингредиенты со склада 1,
-// 4) пишет документ 'productionCreate' с позициями-ингредиентами.
-// Требуется: d.CreatedBy, orderItems (Result.ID + Quantity>0), rm
-func (m *DocumentModel) InsertProductionCreate(
-	d *models.Document,
-	orderItems []models.ProductionOrderItem,
-	rm *RecipeModel,
-) (*models.Document, error) {
-
+// InsertProductionCreate — начало производства по нескольким рецептурам.
+// Ожидается, что d.Items содержит ПЛАН ВЫПУСКА: для каждой позиции
+// d.Items[i].Component.ID == Recipe.Result.ID, d.Items[i].Quantity > 0.
+// Создаёт productionorder, пишет его позиции, рассчитывает и списывает
+// ингредиенты со склада #1, затем создаёт документ 'productionCreate'
+// с позициями-ингредиентами.
+//
+// Требуется: d.CreatedBy (обязателен). Все количества — int.
+func (m *DocumentModel) InsertProductionCreate(d *models.Document) (*models.Document, error) {
 	if d == nil {
 		return nil, errors.New("nil document")
 	}
-	if len(orderItems) == 0 {
-		return nil, errors.New("empty production order items")
+	if d.CreatedBy == 0 {
+		return nil, errors.New("CreatedBy is required")
 	}
-	if rm == nil {
-		return nil, errors.New("nil RecipeModel")
+	if len(d.Items) == 0 {
+		return nil, errors.New("plan (d.Items) is empty")
 	}
+
+	const productionStorageID = 1
+
+	// На базе текущего подключения делаем локальную модель рецептур.
+	rm := &RecipeModel{DB: m.DB}
 
 	tx, err := m.DB.Begin()
 	if err != nil {
@@ -508,7 +498,7 @@ func (m *DocumentModel) InsertProductionCreate(
 	}
 	defer tx.Rollback()
 
-	// 1) Шапка productionorder
+	// 1) Создаём productionorder (на складе 1)
 	res, err := tx.Exec(`INSERT INTO productionorder (ProductionSite_StorageSite_ID) VALUES (?)`, productionStorageID)
 	if err != nil {
 		return nil, fmt.Errorf("insert productionorder failed: %w", err)
@@ -519,12 +509,13 @@ func (m *DocumentModel) InsertProductionCreate(
 	}
 	orderID := int(orderID64)
 
-	// 2) Позиции productionorderitem
-	for _, it := range orderItems {
-		resultID := it.Recipe.Result.ID
+	// 2) Записываем позиции productionorderitem по плану выпуска из d.Items
+	//    (каждый item — это результат рецептуры и его количество).
+	for _, it := range d.Items {
+		resultID := it.Component.ID
 		qty := it.Quantity
 		if resultID <= 0 || qty <= 0 {
-			return nil, errors.New("invalid production order item (resultID or quantity)")
+			return nil, errors.New("invalid plan item (resultID or quantity)")
 		}
 		if _, err := tx.Exec(`
 			INSERT INTO productionorderitem (ProductionOrder_ID, Recipe_Component_ID, Quantity)
@@ -534,40 +525,72 @@ func (m *DocumentModel) InsertProductionCreate(
 		}
 	}
 
-	// 3) Агрегация ингредиентов (int)
-	need, err := aggregateIngredients(orderItems, rm)
-	if err != nil {
-		return nil, err
+	// 3) Считаем суммарную потребность в ингредиентах по всем рецептурам из плана
+	need := make(map[int]int) // IngredientID -> total required qty
+	for _, it := range d.Items {
+		resultID := it.Component.ID
+		qtyPlan := it.Quantity
+		if resultID <= 0 || qtyPlan <= 0 {
+			return nil, errors.New("invalid plan item (resultID or quantity)")
+		}
+
+		// Тянем рецептуру (resultID = Recipe.Result.ID)
+		recipe, err := rm.SelectByID(resultID)
+		if err != nil {
+			return nil, fmt.Errorf("select recipe %d failed: %w", resultID, err)
+		}
+		if recipe == nil || len(recipe.Items) == 0 {
+			return nil, fmt.Errorf("recipe %d has no items", resultID)
+		}
+
+		// Суммируем ингредиенты: требуемое = qtyPlan * ingredient.Quantity
+		for _, ri := range recipe.Items {
+			ingID := ri.Ingredient.ID
+			ingQty := ri.Quantity
+			if ingID <= 0 || ingQty <= 0 {
+				return nil, fmt.Errorf("invalid recipe item for recipe %d", resultID)
+			}
+			need[ingID] += ingQty * qtyPlan
+		}
 	}
 	if len(need) == 0 {
-		return nil, errors.New("recipe ingredients are empty")
+		return nil, errors.New("aggregated ingredients are empty")
 	}
 
-	// 4) Строгое списание со склада 1
-	for compID, qty := range need {
-		if qty <= 0 {
+	// 4) Жёсткое списание ингредиентов со склада 1 под транзакционной блокировкой
+	for compID, req := range need {
+		if req <= 0 {
 			continue
 		}
-		// проверим остатки под блокировкой
+
 		var cur int
 		if err := tx.QueryRow(`
-			SELECT Quantity FROM inventory WHERE Component_ID=? AND StorageSite_ID=? FOR UPDATE
+			SELECT Quantity
+			  FROM inventory
+			 WHERE Component_ID = ? AND StorageSite_ID = ?
+			 FOR UPDATE
 		`, compID, productionStorageID).Scan(&cur); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil, fmt.Errorf("no inventory for component %d on storage %d", compID, productionStorageID)
 			}
 			return nil, err
 		}
-		if cur < qty {
-			return nil, fmt.Errorf("insufficient inventory for component %d: have %d, need %d", compID, cur, qty)
+
+		if cur < req {
+			return nil, fmt.Errorf("insufficient inventory for component %d: have %d, need %d", compID, cur, req)
 		}
+
 		if _, err := tx.Exec(`
-			UPDATE inventory SET Quantity = Quantity - ? WHERE Component_ID=? AND StorageSite_ID=?
-		`, qty, compID, productionStorageID); err != nil {
+			UPDATE inventory
+			   SET Quantity = Quantity - ?
+			 WHERE Component_ID = ? AND StorageSite_ID = ?
+		`, req, compID, productionStorageID); err != nil {
 			return nil, fmt.Errorf("inventory decrement failed (component %d): %w", compID, err)
 		}
+
 		if _, err := tx.Exec(`
-			DELETE FROM inventory WHERE Component_ID=? AND StorageSite_ID=? AND Quantity=0
+			DELETE FROM inventory
+			 WHERE Component_ID = ? AND StorageSite_ID = ? AND Quantity = 0
 		`, compID, productionStorageID); err != nil {
 			return nil, fmt.Errorf("inventory zero cleanup failed (component %d): %w", compID, err)
 		}
@@ -579,15 +602,15 @@ func (m *DocumentModel) InsertProductionCreate(
 		return nil, err
 	}
 
-	// 6) Позиции документа — ингредиенты
+	// 6) Позиции документа — СПИСАННЫЕ ингредиенты (а не план выпуска!)
 	docItems := make([]models.DocumentItem, 0, len(need))
-	for compID, qty := range need {
-		if qty <= 0 {
+	for compID, q := range need {
+		if q <= 0 {
 			continue
 		}
 		docItems = append(docItems, models.DocumentItem{
 			Component: models.Component{ID: compID},
-			Quantity:  qty,
+			Quantity:  q,
 		})
 	}
 	if err := m.insertDocumentItemsTx(tx, docID, docItems); err != nil {
@@ -598,10 +621,11 @@ func (m *DocumentModel) InsertProductionCreate(
 		return nil, err
 	}
 
+	// Заполняем возвращаемый документ фактическими данными
 	d.ID = docID
 	d.Type = "productionCreate"
 	d.ProductionOrderID = &orderID
-	d.Items = docItems
+	d.Items = docItems // здесь — уже ингредиенты, списанные со склада
 	return d, nil
 }
 
@@ -780,29 +804,4 @@ func (m *DocumentModel) insertDocumentItemsTx(tx *sql.Tx, docID int, items []mod
 		}
 	}
 	return nil
-}
-
-// aggregateIngredients — суммарная потребность по ингредиентам для списка позиций заказа.
-// Возвращает map[Component_ID]int. Все количества — int.
-func aggregateIngredients(items []models.ProductionOrderItem, rm *RecipeModel) (map[int]int, error) {
-	sum := make(map[int]int)
-	for _, it := range items {
-		recipeID := it.Recipe.Result.ID
-		qty := it.Quantity
-		if recipeID <= 0 || qty <= 0 {
-			return nil, errors.New("invalid production order item for aggregation")
-		}
-		rec, err := rm.SelectByID(recipeID)
-		if err != nil {
-			return nil, fmt.Errorf("recipe %d not found: %w", recipeID, err)
-		}
-		for _, c := range rec.Items {
-			// предполагается, что c.Quantity — int в моделях
-			if c.Ingredient.ID == 0 || c.Quantity <= 0 {
-				continue
-			}
-			sum[c.Ingredient.ID] += c.Quantity * qty
-		}
-	}
-	return sum, nil
 }
