@@ -64,7 +64,7 @@ export function initTransits({ showToast, showConfirm }) {
     const res = await fetch('/api/storage', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, type: 'transit', ...payload }),
+      body: JSON.stringify({ id, type: 'transitstorage', ...payload }),
     });
     return parseOrToast(res, "Ошибка при сохранении транзитного склада");
   }
@@ -138,14 +138,21 @@ export function initTransits({ showToast, showConfirm }) {
     modal.classList.add('hidden');
     modal.setAttribute('aria-hidden', 'true');
     document.body.style.overflow = '';
-    form?.reset();
+    // Сброс формы и режима
+    if (form) {
+      form.reset();
+      delete form.dataset.mode;
+    }
     editingId = null;
   }
 
   function openCreate() {
     editingId = null;
     if (title) title.textContent = 'Создать транзитный склад';
-    form?.reset();
+    if (form) {
+      form.reset();
+      form.dataset.mode = 'create';  // <-- ЯВНО: режим создания
+    }
     showModal();
   }
 
@@ -153,19 +160,24 @@ export function initTransits({ showToast, showConfirm }) {
     try {
       const t = await fetchOne(id);
       if (!t) return; // ошибка уже показана
+
+      // /api/storage?id=... возвращает массив — берём первый элемент
+      const editing = Array.isArray(t) ? t[0] : t;
+
       editingId = id;
       if (title) title.textContent = 'Изменить транзитный склад';
-
-      // заполнение формы
       if (form) {
         form.reset();
-        form.elements['name'].value        = t.Name || '';
-        form.elements['capacity_kg'].value = t.CapacityKg ?? t.Capacity ?? '';
-        if (form.elements['location']) form.elements['location'].value = t.Location ?? '';
-        if (form.elements['note'])     form.elements['note'].value     = t.Note ?? '';
+        form.dataset.mode = 'edit';   // <-- ЯВНО: режим редактирования
+
+        form.elements['name'].value      = editing.Name || '';
+        form.elements['type'].value      = editing.TransportType || '';
+        form.elements['capacity'].value  = editing.Capacity ?? '';
+        form.elements['location'].value  = editing.Location ?? '';
+        form.elements['note'].value      = editing.Note ?? '';
       }
       showModal();
-    } catch {
+    } catch (err) {
       showToast?.('Ошибка загрузки транзитного склада');
     }
   }
@@ -174,18 +186,20 @@ export function initTransits({ showToast, showConfirm }) {
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(form);
-    const name       = String(fd.get('name') || '').trim();
-    const transportType       = String(fd.get('type') || '').trim();
-    const capacity = parseFloat(String(fd.get('capacity') || '0'));
-    const location   = String(fd.get('location') || '').trim();
-    const note       = String(fd.get('note') || '').trim();
+    const name           = String(fd.get('name') || '').trim();
+    const transportType  = String(fd.get('type') || '').trim();
+    const capacity       = parseFloat(String(fd.get('capacity') || '0'));
+    const location       = String(fd.get('location') || '').trim();
+    const note           = String(fd.get('note') || '').trim();
 
-    if (!name || !Number.isFinite(capacity) || capacity <= 0) {
-      showToast?.('Заполните название и корректную вместимость (кг)');
+    if (!name || !transportType || !Number.isFinite(capacity) || capacity <= 0) {
+      showToast?.('Заполните название, тип и корректную вместимость (кг)');
       return;
     }
 
-    if (editingId) {
+    const mode = form.dataset.mode; // 'create' | 'edit'
+
+    if (mode === 'edit' && editingId) {
       const ok = await updateTransit(editingId, { name, transportType, capacity, location, note });
       if (!ok) return; // ошибка уже показана
       showToast?.('Транзитный склад обновлён', 'success');

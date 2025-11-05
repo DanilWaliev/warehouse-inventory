@@ -95,7 +95,7 @@ func (h *StorageHandler) Post(w http.ResponseWriter, r *http.Request) {
 		Location      string  `json:"location"`
 		TransportType string  `json:"transportType"`
 		Capacity      float64 `json:"capacity"`
-		Notes         string  `json:"notes"`
+		Notes         string  `json:"note"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&NewStorage); err != nil {
@@ -132,7 +132,7 @@ func (h *StorageHandler) Put(w http.ResponseWriter, r *http.Request) {
 		Location      string  `json:"location"`
 		TransportType string  `json:"transportType"`
 		Capacity      float64 `json:"capacity"`
-		Notes         string  `json:"notes"`
+		Notes         string  `json:"note"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&UpdatedStorage); err != nil {

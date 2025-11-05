@@ -13,7 +13,7 @@ import { initTransits } from "./transits.js";
   // ===== DOM =====
   const sectionTitle = document.getElementById("section-title");
 
-  // Модалки со страницы
+  // Модалки со страницы (общие — на будущее)
   const modals = {
     "move-create":    document.getElementById("modal-move-create"),
     "route-create":   document.getElementById("modal-route-create"),
@@ -21,12 +21,11 @@ import { initTransits } from "./transits.js";
   };
 
   // ===== Инициализация модулей таблиц =====
-  // routes.js управляет своей модалкой и таблицей (#table-routes-body, #form-route-create, #modal-route-create)
-  const routes = initRoutes({ showToast, showConfirm });
-  const orders = initOrders({ showToast, showConfirm });
+  const routes  = initRoutes({ showToast, showConfirm });
+  const orders  = initOrders({ showToast, showConfirm });
   const transits = initTransits({ showToast, showConfirm });
 
-  // ===== Хелперы общих модалок (оставляем на будущее) =====
+  // ===== Хелперы общих модалок (оставлены на будущее) =====
   function openModal(modalEl) {
     if (!modalEl) return;
     try { document.activeElement?.blur?.(); } catch (_) {}
@@ -47,30 +46,35 @@ import { initTransits } from "./transits.js";
 
   // ===== Делегирование кликов =====
   document.addEventListener("click", (e) => {
-    // Открытие
+    // Открытие модалок
     const openBtn = e.target.closest("[data-open-modal]");
     if (openBtn) {
       const key = openBtn.getAttribute("data-open-modal");
 
-      // Для маршрутов — используем модуль, чтобы он подгрузил селекты и т.п.
+      // Для маршрутов — через модуль (он сам наполняет форму и сбрасывает editingId)
       if (key === "route-create") {
         e.preventDefault();
-        routes.openCreate(); // сам покажет модалку и наполнит форму
+        routes.openCreate();
         return;
       }
 
-      // Остальные (пока без модулей) — откроем «как есть»
+      // Для транзитных складов — ТОЛЬКО через модуль (иначе editingId залипает → PUT)
+      if (key === "transit-create") {
+        e.preventDefault();
+        transits.openCreate();
+        return;
+      }
+
+      // Остальные (временно «как есть»)
       const modal = getModalByKey(key);
       if (modal) {
-        // перед открытием можно сделать reset
-        if (key === "move-create")  resetMoveCreate(modal);
-        if (key === "transit-create") resetTransitCreate(modal);
+        if (key === "move-create") resetMoveCreate(modal); // временный хук
         openModal(modal);
       }
       return;
     }
 
-    // Закрытие
+    // Закрытие модалок
     const closeBtn = e.target.closest("[data-close-modal]");
     if (closeBtn) {
       const parentModal = closeBtn.closest(".modal");
@@ -98,12 +102,11 @@ import { initTransits } from "./transits.js";
   });
 
   // ===== Первичная загрузка таблиц =====
-  // Список маршрутов грузит модуль routes
   routes.load();
   orders.load();
   transits.load();
 
-  // ===== Хуки пред-открытия (для немодульных форм) =====
+  // ===== Хуки пред-открытия для немодульных форм =====
   function resetMoveCreate(modalEl) {
     const form = modalEl.querySelector("form");
     form?.reset?.();
@@ -118,9 +121,6 @@ import { initTransits } from "./transits.js";
         </div>
       `;
     }
-  }
-  function resetTransitCreate(modalEl) {
-    modalEl.querySelector("form")?.reset?.();
   }
 
   // ===== Сервис: подстройка отступа под header =====

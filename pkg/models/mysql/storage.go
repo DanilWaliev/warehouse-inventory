@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"warehouse-inventory/pkg/models"
 )
 
@@ -19,26 +20,43 @@ func NewStorageModel(db *sql.DB) *StorageModel {
 
 // Возвращает хранилище и весь его инвентарь.
 func (m *StorageModel) SelectWithInventoryByID(storageID int) (*models.Storage, error) {
-	// 1) Шапка хранилища
-	headerStmt := `
-		SELECT s.StorageSite_ID, s.Name, s.Location, s.Type, s.Note
+	// 1) Шапка + данные из transitstorage (если есть)
+	const header = `
+		SELECT
+			s.StorageSite_ID,
+			s.Name,
+			s.Location,
+			s.Type,
+			s.Note,
+			t.TransportType,
+			t.Capacity
 		FROM storagesite s
+		LEFT JOIN transitstorage t ON t.StorageSite_ID = s.StorageSite_ID
 		WHERE s.StorageSite_ID = ?;
 	`
-	row := m.DB.QueryRow(headerStmt, storageID)
+	row := m.DB.QueryRow(header, storageID)
 
 	st := &models.Storage{}
-	var location string
-	if err := row.Scan(&st.ID, &st.Name, &location, &st.Type, &st.Note); err != nil {
+	var tt sql.NullString
+	var cap sql.NullFloat64
+
+	if err := row.Scan(&st.ID, &st.Name, &st.Location, &st.Type, &st.Note, &tt, &cap); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, models.ErrNoRecord
 		}
 		return nil, err
 	}
-	st.Location = location
+	if tt.Valid {
+		v := tt.String
+		st.TransportType = &v
+	}
+	if cap.Valid {
+		v := cap.Float64
+		st.Capacity = &v
+	}
 
-	// 2) Позиции инвентаря (join component)
-	itemsStmt := `
+	// 2) Инвентарь
+	const items = `
 		SELECT
 			c.Component_ID,
 			c.Name,
@@ -51,8 +69,7 @@ func (m *StorageModel) SelectWithInventoryByID(storageID int) (*models.Storage, 
 		WHERE i.StorageSite_ID = ?
 		ORDER BY c.Name;
 	`
-
-	rows, err := m.DB.Query(itemsStmt, storageID)
+	rows, err := m.DB.Query(items, storageID)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +77,6 @@ func (m *StorageModel) SelectWithInventoryByID(storageID int) (*models.Storage, 
 
 	for rows.Next() {
 		var it models.StorageItem
-
 		if err := rows.Scan(
 			&it.Component.ID,
 			&it.Component.Name,
@@ -71,7 +87,6 @@ func (m *StorageModel) SelectWithInventoryByID(storageID int) (*models.Storage, 
 		); err != nil {
 			return nil, err
 		}
-
 		st.Inventory = append(st.Inventory, it)
 	}
 	if err := rows.Err(); err != nil {
@@ -82,10 +97,20 @@ func (m *StorageModel) SelectWithInventoryByID(storageID int) (*models.Storage, 
 }
 
 func (m *StorageModel) SelectAllWithoutInventory() ([]*models.Storage, error) {
-	rows, err := m.DB.Query(`
-		SELECT s.StorageSite_ID, s.Name, s.Location, s.Type, s.Note
+	const q = `
+		SELECT
+			s.StorageSite_ID,
+			s.Name,
+			s.Location,
+			s.Type,
+			s.Note,
+			t.TransportType,
+			t.Capacity
 		FROM storagesite s
-		ORDER BY s.StorageSite_ID`)
+		LEFT JOIN transitstorage t ON t.StorageSite_ID = s.StorageSite_ID
+		ORDER BY s.StorageSite_ID;
+	`
+	rows, err := m.DB.Query(q)
 	if err != nil {
 		return nil, err
 	}
@@ -94,8 +119,22 @@ func (m *StorageModel) SelectAllWithoutInventory() ([]*models.Storage, error) {
 	var res []*models.Storage
 	for rows.Next() {
 		st := &models.Storage{}
-		if err := rows.Scan(&st.ID, &st.Name, &st.Location, &st.Type, &st.Note); err != nil {
+		var tt sql.NullString
+		var cap sql.NullFloat64
+
+		if err := rows.Scan(
+			&st.ID, &st.Name, &st.Location, &st.Type, &st.Note,
+			&tt, &cap,
+		); err != nil {
 			return nil, err
+		}
+		if tt.Valid {
+			v := tt.String
+			st.TransportType = &v
+		}
+		if cap.Valid {
+			v := cap.Float64
+			st.Capacity = &v
 		}
 		res = append(res, st)
 	}
@@ -106,27 +145,61 @@ func (m *StorageModel) SelectAllWithoutInventory() ([]*models.Storage, error) {
 }
 
 func (m *StorageModel) SelectWithoutInventoryByID(id int) (*models.Storage, error) {
-	row := m.DB.QueryRow(`
-		SELECT s.StorageSite_ID, s.Name, s.Location, s.Type, s.Note
+	const q = `
+		SELECT
+			s.StorageSite_ID,
+			s.Name,
+			s.Location,
+			s.Type,
+			s.Note,
+			t.TransportType,
+			t.Capacity
 		FROM storagesite s
-		WHERE s.StorageSite_ID = ?`, id)
+		LEFT JOIN transitstorage t ON t.StorageSite_ID = s.StorageSite_ID
+		WHERE s.StorageSite_ID = ?;
+	`
+	row := m.DB.QueryRow(q, id)
 
 	st := &models.Storage{}
-	if err := row.Scan(&st.ID, &st.Name, &st.Location, &st.Type, &st.Note); err != nil {
+	var tt sql.NullString
+	var cap sql.NullFloat64
+
+	if err := row.Scan(
+		&st.ID, &st.Name, &st.Location, &st.Type, &st.Note,
+		&tt, &cap,
+	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, models.ErrNoRecord
 		}
 		return nil, err
 	}
+	if tt.Valid {
+		v := tt.String
+		st.TransportType = &v
+	}
+	if cap.Valid {
+		v := cap.Float64
+		st.Capacity = &v
+	}
 	return st, nil
 }
 
 func (m *StorageModel) SelectAllWithInventory() ([]*models.Storage, error) {
-	// 1) Загружаем все хранилища
-	rows, err := m.DB.Query(`
-		SELECT s.StorageSite_ID, s.Location, s.Type, s.Note
+	// 1) Все хранилища (+ возможные поля транзита)
+	const headers = `
+		SELECT
+			s.StorageSite_ID,
+			s.Name,
+			s.Location,
+			s.Type,
+			s.Note,
+			t.TransportType,
+			t.Capacity
 		FROM storagesite s
-		ORDER BY s.StorageSite_ID`)
+		LEFT JOIN transitstorage t ON t.StorageSite_ID = s.StorageSite_ID
+		ORDER BY s.StorageSite_ID;
+	`
+	rows, err := m.DB.Query(headers)
 	if err != nil {
 		return nil, err
 	}
@@ -134,11 +207,27 @@ func (m *StorageModel) SelectAllWithInventory() ([]*models.Storage, error) {
 
 	stores := make([]*models.Storage, 0, 16)
 	idx := make(map[int]*models.Storage)
+
 	for rows.Next() {
 		st := &models.Storage{}
-		if err := rows.Scan(&st.ID, &st.Location, &st.Type, &st.Note); err != nil {
+		var tt sql.NullString
+		var cap sql.NullFloat64
+
+		if err := rows.Scan(
+			&st.ID, &st.Name, &st.Location, &st.Type, &st.Note,
+			&tt, &cap,
+		); err != nil {
 			return nil, err
 		}
+		if tt.Valid {
+			v := tt.String
+			st.TransportType = &v
+		}
+		if cap.Valid {
+			v := cap.Float64
+			st.Capacity = &v
+		}
+
 		stores = append(stores, st)
 		idx[st.ID] = st
 	}
@@ -149,24 +238,26 @@ func (m *StorageModel) SelectAllWithInventory() ([]*models.Storage, error) {
 		return stores, nil
 	}
 
-	// 2) Подтягиваем инвентарь для всех хранилищ одной выборкой
-	items, err := m.DB.Query(`
+	// 2) Общая выборка инвентаря и раскладка по складам
+	const items = `
 		SELECT 
 			i.StorageSite_ID,
 			c.Component_ID, c.Name, c.Weight, c.Type, c.Note,
 			i.Quantity
 		FROM inventory i
 		JOIN component c ON c.Component_ID = i.Component_ID
-		ORDER BY i.StorageSite_ID, c.Name`)
+		ORDER BY i.StorageSite_ID, c.Name;
+	`
+	itRows, err := m.DB.Query(items)
 	if err != nil {
 		return nil, err
 	}
-	defer items.Close()
+	defer itRows.Close()
 
-	for items.Next() {
+	for itRows.Next() {
 		var storageID int
 		var it models.StorageItem
-		if err := items.Scan(
+		if err := itRows.Scan(
 			&storageID,
 			&it.Component.ID,
 			&it.Component.Name,
@@ -181,7 +272,7 @@ func (m *StorageModel) SelectAllWithInventory() ([]*models.Storage, error) {
 			st.Inventory = append(st.Inventory, it)
 		}
 	}
-	if err := items.Err(); err != nil {
+	if err := itRows.Err(); err != nil {
 		return nil, err
 	}
 
@@ -189,77 +280,106 @@ func (m *StorageModel) SelectAllWithInventory() ([]*models.Storage, error) {
 }
 
 func (m *StorageModel) SelectWithInventoryByType(stype string) ([]*models.Storage, error) {
-	// 1) Шапка хранилища
-	headerStmt := `
-		SELECT s.StorageSite_ID, s.Name, s.Location, s.Type, s.Note
+	// 1) Список складов нужного типа (+ transitstorage данные)
+	const headers = `
+		SELECT
+			s.StorageSite_ID,
+			s.Name,
+			s.Location,
+			s.Type,
+			s.Note,
+			t.TransportType,
+			t.Capacity
 		FROM storagesite s
-		WHERE s.Type = ?;
+		LEFT JOIN transitstorage t ON t.StorageSite_ID = s.StorageSite_ID
+		WHERE s.Type = ?
+		ORDER BY s.StorageSite_ID;
 	`
-	rows, err := m.DB.Query(headerStmt, stype)
+	rows, err := m.DB.Query(headers, stype)
 	if err != nil {
 		return nil, err
 	}
-
 	defer rows.Close()
 
 	var storages []*models.Storage
+	idList := make([]int, 0, 16)
+	idx := make(map[int]*models.Storage)
 
 	for rows.Next() {
-		s := &models.Storage{}
+		st := &models.Storage{}
+		var tt sql.NullString
+		var cap sql.NullFloat64
 
-		err := rows.Scan(&s.ID, &s.Name, &s.Location, &s.Type, &s.Note)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, models.ErrNoRecord
-			}
+		if err := rows.Scan(
+			&st.ID, &st.Name, &st.Location, &st.Type, &st.Note,
+			&tt, &cap,
+		); err != nil {
 			return nil, err
 		}
+		if tt.Valid {
+			v := tt.String
+			st.TransportType = &v
+		}
+		if cap.Valid {
+			v := cap.Float64
+			st.Capacity = &v
+		}
 
-		storages = append(storages, s)
+		storages = append(storages, st)
+		idx[st.ID] = st
+		idList = append(idList, st.ID)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(storages) == 0 {
+		return storages, nil
 	}
 
-	// 2) Позиции инвентаря (join component)
-	itemsStmt := `
-		SELECT
-			c.Component_ID,
-			c.Name,
-			c.Weight,
-			c.Type,
-			c.Note,
+	// 2) Инвентарь только по этим складам
+	placeholders := make([]string, len(idList))
+	args := make([]any, len(idList))
+	for i, id := range idList {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+
+	q := fmt.Sprintf(`
+		SELECT 
+			i.StorageSite_ID,
+			c.Component_ID, c.Name, c.Weight, c.Type, c.Note,
 			i.Quantity
 		FROM inventory i
 		JOIN component c ON c.Component_ID = i.Component_ID
-		WHERE i.Type = ?
-		ORDER BY c.Name;
-	`
+		WHERE i.StorageSite_ID IN (%s)
+		ORDER BY i.StorageSite_ID, c.Name;
+	`, strings.Join(placeholders, ","))
+	itRows, err := m.DB.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer itRows.Close()
 
-	for _, s := range storages {
-		rows, err := m.DB.Query(itemsStmt, stype)
-		if err != nil {
+	for itRows.Next() {
+		var storageID int
+		var it models.StorageItem
+		if err := itRows.Scan(
+			&storageID,
+			&it.Component.ID,
+			&it.Component.Name,
+			&it.Component.Weight,
+			&it.Component.Type,
+			&it.Component.Note,
+			&it.Quantity,
+		); err != nil {
 			return nil, err
 		}
-		defer rows.Close()
-
-		for rows.Next() {
-			var it models.StorageItem
-			var qtyDec float64
-
-			if err := rows.Scan(
-				&it.Component.ID,
-				&it.Component.Name,
-				&it.Component.Weight,
-				&it.Component.Type,
-				&it.Component.Note,
-				&qtyDec,
-			); err != nil {
-				return nil, err
-			}
-
-			s.Inventory = append(s.Inventory, it)
+		if st := idx[storageID]; st != nil {
+			st.Inventory = append(st.Inventory, it)
 		}
-		if err := rows.Err(); err != nil {
-			return nil, err
-		}
+	}
+	if err := itRows.Err(); err != nil {
+		return nil, err
 	}
 
 	return storages, nil
