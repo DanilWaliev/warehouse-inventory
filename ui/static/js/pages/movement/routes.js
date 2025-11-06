@@ -56,7 +56,7 @@ export function initRoutes({ showToast, showConfirm }) {
   }
 
   async function fetchTransits() {
-    const res = await fetch('/api/storage?type=transit&inventory=false');
+    const res = await fetch('/api/storage?type=transitstorage&inventory=false');
     return parseListGET(res, "Ошибка загрузки транзитных складов");
   }
 
@@ -197,23 +197,22 @@ export function initRoutes({ showToast, showConfirm }) {
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(form);
-    const name   = String(fd.get('name') || '').trim();
     const fromId = parseInt(fd.get('from_id') || '0', 10);
     const toId   = parseInt(fd.get('to_id') || '0', 10);
     const trId   = parseInt(fd.get('transit_id') || '0', 10);
     const eta    = parseInt(fd.get('eta_hours') || '0', 10);
 
-    if (!name || !fromId || !toId || !trId || !Number.isFinite(eta) || eta <= 0) {
+    if (!fromId || !toId || !trId || !Number.isFinite(eta) || eta <= 0) {
       showToast?.('Заполните поля корректно');
       return;
     }
 
     if (editingId) {
-      const ok = await updateRoute(editingId, { name, fromId, toId, transitId: trId, etaHours: eta });
+      const ok = await updateRoute(editingId, {fromId, toId, transitId: trId, etaHours: eta });
       if (!ok) return;
       showToast?.('Маршрут обновлён', 'success');
     } else {
-      const ok = await createRoute({ name, fromId, toId, transitId: trId, etaHours: eta });
+      const ok = await createRoute({fromId, toId, transitId: trId, etaHours: eta });
       if (!ok) return;
       showToast?.('Маршрут создан', 'success');
     }

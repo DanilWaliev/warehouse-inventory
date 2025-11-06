@@ -60,7 +60,7 @@
                 <th style="width:8ch;">ID</th>
                 <th>Откуда</th>
                 <th>Куда</th>
-                <th>Транзитный склад</th>
+                <th>Транзитный</th>
                 <th style="width:18ch;">Время</th>
               </tr>
             </thead>
@@ -179,36 +179,28 @@
   <div id="modal-route-create" class="modal hidden" aria-hidden="true">
     <div class="modal-content">
       <h3>Создать маршрут</h3>
-      <form method="post">
-        <div class="mb-4">
-          <label>Название</label>
-          <input name="name" required>
-        </div>
-
+      <form id="form-route-create" method="post">
         <div class="mb-4">
           <label>Откуда (склад)</label>
           <select name="from_id" required>
-            <!-- заполни через fetch -->
           </select>
         </div>
 
         <div class="mb-4">
           <label>Куда (склад)</label>
           <select name="to_id" required>
-            <!-- заполни через fetch -->
           </select>
         </div>
 
         <div class="mb-4">
           <label>Транзитный склад</label>
           <select name="transit_id" required>
-            <!-- заполни через fetch -->
           </select>
         </div>
 
         <div class="mb-4">
           <label>Предполагаемое время (ч)</label>
-          <input type="number" name="estimated_hours" min="1" step="1" required>
+          <input type="number" name="eta_hours" min="1" step="1" required>
         </div>
 
         <div class="flex justify-end gap-2">
