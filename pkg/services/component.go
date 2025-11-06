@@ -5,8 +5,6 @@ import (
 	"warehouse-inventory/pkg/models/mysql"
 )
 
-// TODO: заменить конкретные типы на интерфейсы
-
 type ComponentService struct {
 	componentModel *mysql.ComponentModel
 }

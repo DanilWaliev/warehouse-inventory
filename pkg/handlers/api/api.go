@@ -150,3 +150,20 @@ func (h *APIHandler) Document(w http.ResponseWriter, r *http.Request) {
 		}, ", "))
 	}
 }
+
+func (h *APIHandler) Route(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		//
+	case http.MethodPost:
+		//
+	case http.MethodDelete:
+		//
+	default:
+		w.Header().Set("Allow", strings.Join([]string{
+			http.MethodGet,
+			http.MethodPost,
+			http.MethodDelete,
+		}, ", "))
+	}
+}

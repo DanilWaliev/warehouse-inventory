@@ -84,3 +84,10 @@ type DocumentItem struct {
 	Component Component
 	Quantity  int
 }
+
+type Route struct {
+	FromID    int
+	ToID      int
+	TransitID int
+	Edh       int // estimated duration hours
+}
