@@ -13,6 +13,7 @@ export function initOrders({ showToast, showConfirm }) {
     name: document.getElementById('move-route-name'),
     tr:   document.getElementById('move-route-transit'),
     eta:  document.getElementById('move-route-eta'),
+    capacity: document.getElementById('move-route-capacity'),
   };
   const items = {
     body:   document.getElementById('move-items-body'),
@@ -173,16 +174,19 @@ export function initOrders({ showToast, showConfirm }) {
       routeInfo.name.textContent = '—';
       routeInfo.tr.textContent   = '—';
       routeInfo.eta.textContent  = '—';
+      routeInfo.capacity.textContent = '—';
       return;
     }
     const rid = route.ID ?? route.Route_ID ?? '';
     const tr  = route.Transit?.Name ?? (route.TransitID ? `#${route.TransitID}` : '—');
     const nm  = route.Name ?? `${route.From?.Name ?? `#${route.From?.ID ?? ''}`} → ${route.To?.Name ?? `#${route.To?.ID ?? ''}`}`;
-    const eta = route.Edh + " ч." ?? route.EstimatedDurationHours ?? '—';
+    const eta = route.Edh + " ч" ?? '—';
+    const capacity = route.Transit.Capacity + " кг" ?? '—';
     routeInfo.id.value       = String(rid);
     routeInfo.name.textContent = nm;
     routeInfo.tr.textContent   = tr;
     routeInfo.eta.textContent  = String(eta);
+    routeInfo.capacity.textContent = String(capacity);
   }
 
   // ===== заполнение селектов =====
