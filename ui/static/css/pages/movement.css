@@ -56,3 +56,81 @@
   border: 1px solid var(--color-success);
   background-color: rgba(16,185,129,0.08);
 }
+
+/* больше и фиксированнее по ширине, со скроллом внутри при переполнении */
+#modal-move-create .modal-content {
+  width: 1100px;                 /* целевая ширина модалки */
+  max-width: 96vw !important;    /* перебиваем inline max-width:900px */
+  max-height: calc(100vh - 80px);
+  padding: 24px;
+  overflow: auto;                 /* прокрутка внутри модалки, фон не скроллится */
+  border-radius: var(--radius, 12px);
+}
+
+/* первый .mb-4 в модалке — это блок "Отправитель/Получатель": делаем 2 колонки */
+#modal-move-create .modal-content > .mb-4:first-of-type {
+  display: grid !important;      /* перебиваем inline display */
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+/* ровные группы полей: подпись над контролом, единые отступы */
+#modal-move-create .mb-3 {
+  display: grid;
+  grid-template-rows: auto auto;
+  gap: 6px;
+}
+
+/* аккуратные подписи */
+#modal-move-create label {
+  font-size: 12px;
+  color: var(--muted, #6b7280);
+}
+
+/* единый вид инпутов/селектов/текстовых полей внутри модалки */
+#modal-move-create input,
+#modal-move-create select,
+#modal-move-create textarea {
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 10px;
+  box-sizing: border-box;
+}
+
+/* компактные селекты складов (визуально меньше и уже) */
+#modal-move-create #move-from,
+#modal-move-create #move-to {
+  font-size: 14px;
+  line-height: 1.2;
+  min-height: 32px;
+  padding: 4px 8px;
+  max-width: 280px; /* при желании убери строку, если нужна полная ширина */
+}
+
+/* строка с инфой по маршруту — в одну линию с переносами */
+#modal-move-create #move-route-info {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+#modal-move-create #move-route-info > div {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+
+/* таблица позиций: ровное выравнивание и стабильные колонки */
+#modal-move-create .table th,
+#modal-move-create .table td {
+  vertical-align: middle;
+}
+#modal-move-create .table th:nth-child(1) { width: 60%; }
+#modal-move-create .table th:nth-child(2) { width: 30%; }
+#modal-move-create .table th:nth-child(3) { width: 10%; }
+
+/* ряд с кнопками внизу — фиксированный зазор */
+#modal-move-create .flex.justify-end {
+  gap: 8px;
+}

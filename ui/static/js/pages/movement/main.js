@@ -66,11 +66,12 @@ import { initTransits } from "./transits.js";
       }
 
       // Остальные (временно «как есть»)
-      const modal = getModalByKey(key);
-      if (modal) {
-        if (key === "move-create") resetMoveCreate(modal); // временный хук
-        openModal(modal);
+      if (key === "move-create") {
+        e.preventDefault();
+        orders.openCreate(); // сам наполнит и покажет модалку
+        return;
       }
+
       return;
     }
 
