@@ -86,8 +86,9 @@ type DocumentItem struct {
 }
 
 type Route struct {
-	FromID    int
-	ToID      int
-	TransitID int
-	Edh       int // estimated duration hours
+	ID      int
+	From    Storage
+	To      Storage
+	Transit Storage
+	Edh     int // estimated duration hours
 }

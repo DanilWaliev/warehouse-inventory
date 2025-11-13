@@ -12,6 +12,7 @@ type MySQLModels struct {
 	ProductionOrderModel *ProductionOrderModel
 	StorageModel         *StorageModel
 	DocumentModel        *DocumentModel
+	RouteModel           *RouteModel
 }
 
 // Конструктор
@@ -23,5 +24,6 @@ func NewMySQLModels(db *sql.DB) *MySQLModels {
 		ProductionOrderModel: NewProductionOrderModel(db),
 		StorageModel:         NewStorageModel(db),
 		DocumentModel:        NewDocumentModel(db),
+		RouteModel:           NewRouteModel(db),
 	}
 }

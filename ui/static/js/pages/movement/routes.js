@@ -105,7 +105,7 @@ export function initRoutes({ showToast, showConfirm }) {
           <td>${r.From?.Name || ''}</td>
           <td>${r.To?.Name || ''}</td>
           <td>${r.Transit?.Name || ''}</td>
-          <td>${r.ETAHours ?? ''}</td>
+          <td>${r.Edh ?? ''}</td>
           <td>
             <button class="btn-edit" data-id="${r.ID}">Изм.</button>
             <button class="btn-delete" data-id="${r.ID}">Удалить</button>

@@ -9,6 +9,7 @@ type Services struct {
 	ProductionOrderService *ProductionOrderService
 	StorageService         *StorageService
 	DocumentService        *DocumentService
+	RouteService           *RouteService
 }
 
 func NewServices(models *mysql.MySQLModels) *Services {
@@ -19,5 +20,6 @@ func NewServices(models *mysql.MySQLModels) *Services {
 		ProductionOrderService: NewOrderService(models.ProductionOrderModel, models.RecipeModel),
 		StorageService:         NewStorageService(models.StorageModel),
 		DocumentService:        NewDocumentService(models.DocumentModel),
+		RouteService:           NewRouteService(models.RouteModel, models.StorageModel),
 	}
 }

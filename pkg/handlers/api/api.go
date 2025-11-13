@@ -17,6 +17,7 @@ type APIHandler struct {
 	OrderHandler     *OrderHandler
 	StorageHandler   *StorageHandler
 	DocumentHandler  *DocumentHandler
+	RouteHandler     *RouteHandler
 }
 
 func NewAPIHandler(helper *handlers.LogHelper, services *services.Services) *APIHandler {
@@ -28,6 +29,7 @@ func NewAPIHandler(helper *handlers.LogHelper, services *services.Services) *API
 		OrderHandler:     NewOrderHandler(helper, services.ProductionOrderService),
 		StorageHandler:   NewStorageHandler(helper, services.StorageService),
 		DocumentHandler:  NewDocumentHandler(helper, services.DocumentService),
+		RouteHandler:     NewRouteHandler(helper, services.RouteService),
 	}
 }
 
@@ -154,11 +156,11 @@ func (h *APIHandler) Document(w http.ResponseWriter, r *http.Request) {
 func (h *APIHandler) Route(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		//
+		h.RouteHandler.Get(w, r)
 	case http.MethodPost:
-		//
+		h.RouteHandler.Post(w, r)
 	case http.MethodDelete:
-		//
+		h.RouteHandler.Delete(w, r)
 	default:
 		w.Header().Set("Allow", strings.Join([]string{
 			http.MethodGet,
