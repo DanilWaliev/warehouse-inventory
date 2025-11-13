@@ -5,6 +5,9 @@
   import { showToast } from "../../toast.js"
   import { showConfirm } from "../../confirm.js";
   import { initWarehouses } from "./warehouses.js";
+  import { initTransitStock } from "./transitStock.js";
+  import { initProductionStock } from "./productionStock.js";
+
 
   (async function bootstrap() {
     // DOM: основные элементы
@@ -30,6 +33,10 @@
     const tmcModule = await initTMC({ showToast, showConfirm, modal });
     const warehousesModule = await initWarehouses({ showToast, showConfirm, modal });
     const warehouseStockModule = await initWarehouseStock({ showToast });
+    const transitStockModule = await initTransitStock({ showToast });
+    const productionStockModule = await initProductionStock({ showToast });
+
+
 
     let active = 'tmc';
 
@@ -91,6 +98,25 @@
         }
       }
 
+      if (transitStockModule) {
+        if (tab === 'stock-transit') {
+          transitStockModule.showControls?.();
+          transitStockModule.load?.();
+        } else {
+          transitStockModule.hideControls?.();
+        }
+      }
+
+      if (productionStockModule) {
+        if (tab === 'stock-production') {
+          productionStockModule.showControls?.();
+          productionStockModule.load?.();
+        } else {
+          productionStockModule.hideControls?.();
+        }
+      }
+
+
       switch (tab) {
         case 'tmc':
           if (tmcModule && tmcModule.load) tmcModule.load();
@@ -108,8 +134,6 @@
       showModalForm(active);
 
       if (active === 'tmc' && tmcModule && tmcModule.openModal) tmcModule.openModal();
-      // if (active === 'recipe' && recipesModule && recipesModule.openModal) recipesModule.openModal();
-      // if (active === 'order' && ordersModule && ordersModule.openModal) ordersModule.openModal();
 
       document.body.style.overflow = 'hidden';
     }
@@ -120,8 +144,6 @@
       document.body.style.overflow = '';
 
       if (tmcModule && tmcModule.reset) tmcModule.reset();
-      // if (recipesModule && recipesModule.reset) recipesModule.reset();
-      // if (ordersModule && ordersModule.reset) ordersModule.reset();
 
       hideAllModalForms();
     }
