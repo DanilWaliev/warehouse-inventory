@@ -10,26 +10,28 @@ import (
 /* Обработчики запросов к API. Обработчики в зависимости от HTTP-метода вызывают методы соответствующих структур */
 
 type APIHandler struct {
-	Helper           *handlers.LogHelper
-	ComponentHandler *ComponentHandler
-	RecipeHandler    *RecipeHandler
-	UserHandler      *UserHandler
-	OrderHandler     *OrderHandler
-	StorageHandler   *StorageHandler
-	DocumentHandler  *DocumentHandler
-	RouteHandler     *RouteHandler
+	Helper               *handlers.LogHelper
+	ComponentHandler     *ComponentHandler
+	RecipeHandler        *RecipeHandler
+	UserHandler          *UserHandler
+	OrderHandler         *OrderHandler
+	StorageHandler       *StorageHandler
+	DocumentHandler      *DocumentHandler
+	RouteHandler         *RouteHandler
+	MovementOrderHandler *MovementOrderHandler
 }
 
 func NewAPIHandler(helper *handlers.LogHelper, services *services.Services) *APIHandler {
 	return &APIHandler{
-		Helper:           helper,
-		ComponentHandler: NewComponentHandler(helper, services.ComponentService),
-		RecipeHandler:    NewRecipeHandler(helper, services.RecipeService),
-		UserHandler:      NewUserHandler(helper, services.UserService),
-		OrderHandler:     NewOrderHandler(helper, services.ProductionOrderService),
-		StorageHandler:   NewStorageHandler(helper, services.StorageService),
-		DocumentHandler:  NewDocumentHandler(helper, services.DocumentService),
-		RouteHandler:     NewRouteHandler(helper, services.RouteService),
+		Helper:               helper,
+		ComponentHandler:     NewComponentHandler(helper, services.ComponentService),
+		RecipeHandler:        NewRecipeHandler(helper, services.RecipeService),
+		UserHandler:          NewUserHandler(helper, services.UserService),
+		OrderHandler:         NewOrderHandler(helper, services.ProductionOrderService),
+		StorageHandler:       NewStorageHandler(helper, services.StorageService),
+		DocumentHandler:      NewDocumentHandler(helper, services.DocumentService),
+		RouteHandler:         NewRouteHandler(helper, services.RouteService),
+		MovementOrderHandler: NewMovementOrderHandler(helper, services.MovementOrderService),
 	}
 }
 
@@ -166,6 +168,23 @@ func (h *APIHandler) Route(w http.ResponseWriter, r *http.Request) {
 			http.MethodGet,
 			http.MethodPost,
 			http.MethodDelete,
+		}, ", "))
+	}
+}
+
+func (h *APIHandler) MovementOrder(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		h.MovementOrderHandler.Get(w, r)
+	case http.MethodPost:
+		h.MovementOrderHandler.Post(w, r)
+	case http.MethodPut:
+		h.MovementOrderHandler.Put(w, r)
+	default:
+		w.Header().Set("Allow", strings.Join([]string{
+			http.MethodGet,
+			http.MethodPost,
+			http.MethodPut,
 		}, ", "))
 	}
 }

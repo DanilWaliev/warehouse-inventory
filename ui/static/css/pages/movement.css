@@ -98,6 +98,10 @@
   box-sizing: border-box;
 }
 
+#batches-wrap > div > div.table-wrap > table > tbody > tr > td:nth-child(2) > input {
+  width: 100px;
+}
+
 /* компактные селекты складов (визуально меньше и уже) */
 #modal-move-create #move-from,
 #modal-move-create #move-to {

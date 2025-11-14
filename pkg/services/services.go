@@ -10,6 +10,7 @@ type Services struct {
 	StorageService         *StorageService
 	DocumentService        *DocumentService
 	RouteService           *RouteService
+	MovementOrderService   *MovementOrderService
 }
 
 func NewServices(models *mysql.MySQLModels) *Services {
@@ -21,5 +22,6 @@ func NewServices(models *mysql.MySQLModels) *Services {
 		StorageService:         NewStorageService(models.StorageModel),
 		DocumentService:        NewDocumentService(models.DocumentModel),
 		RouteService:           NewRouteService(models.RouteModel, models.StorageModel),
+		MovementOrderService:   NewMovementOrderService(models.MovementOrderModel, models.RouteModel),
 	}
 }

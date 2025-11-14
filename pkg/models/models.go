@@ -92,3 +92,27 @@ type Route struct {
 	Transit Storage
 	Edh     int // estimated duration hours
 }
+
+type Batch struct {
+	ID     int
+	Items  []BatchItem
+	Status string
+}
+
+type BatchItem struct {
+	Component Component
+	Quantity  int
+}
+
+type MovementOrder struct {
+	ID        int
+	Route     Route
+	Status    string
+	Batches   []Batch
+	CreatedBy int
+	CreatedAt time.Time
+	Ead       time.Time // Estimated arrival date
+	Asd       time.Time // Actual shipment date
+	Aad       time.Time // Actual arrival
+	Notes     string
+}
