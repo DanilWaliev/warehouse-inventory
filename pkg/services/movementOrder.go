@@ -72,7 +72,7 @@ func (s *MovementOrderService) Create(order *models.MovementOrder) error {
 		for _, item := range batch.Items {
 			component, err := s.componentModel.SelectByID(item.Component.ID)
 			if err != nil {
-				return nil
+				return err
 			}
 			item.Component = *component
 		}
@@ -130,4 +130,8 @@ func (s *MovementOrderService) UpdateBatchStatus(batchId int, orderId int, newSt
 	}
 
 	return nil
+}
+
+func (s *MovementOrderService) Delete(id int) error {
+	return s.movementOrderModel.Delete(id)
 }

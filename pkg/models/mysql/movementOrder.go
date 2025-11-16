@@ -457,3 +457,21 @@ func (m *MovementOrderModel) UpdateBatchStatus(batchID int, newStatus string) er
 	_, err := m.DB.Exec(`UPDATE movementorderbatch SET Status=? WHERE Batch_ID=?`, newStatus, batchID)
 	return err
 }
+
+// Delete удаляет заказ перемещения по ID.
+// Благодаря ON DELETE CASCADE на movementorderbatch и movementorderbatchitem
+// при удалении заказа удаляются все его партии и их позиции.
+func (m *MovementOrderModel) Delete(id int) error {
+	res, err := m.DB.Exec(`DELETE FROM movementorder WHERE Order_ID = ?`, id)
+	if err != nil {
+		return err
+	}
+	aff, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if aff == 0 {
+		return models.ErrNoRecord
+	}
+	return nil
+}

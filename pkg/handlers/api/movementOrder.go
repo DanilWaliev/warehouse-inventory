@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"warehouse-inventory/pkg/handlers"
 	"warehouse-inventory/pkg/handlers/auth"
 	"warehouse-inventory/pkg/models"
@@ -23,6 +24,45 @@ func NewMovementOrderHandler(helper *handlers.LogHelper, movementOrderService *s
 }
 
 func (h *MovementOrderHandler) Get(w http.ResponseWriter, r *http.Request) {
+	// GET по id
+	var ids []int
+	for _, idStr := range r.URL.Query()["id"] {
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			h.Helper.ClientError(w, http.StatusBadRequest)
+			return
+		}
+		ids = append(ids, id)
+	}
+
+	var (
+		orders []*models.MovementOrder
+		err    error
+	)
+
+	if len(ids) > 0 {
+		orders, err = h.MovementOrderService.ReadByIDs(ids)
+	} else {
+		orders, err = h.MovementOrderService.ReadAll()
+	}
+
+	if err != nil {
+		h.Helper.ServerError(w, err)
+		return
+	}
+	if len(orders) == 0 {
+		h.Helper.NotFound(w)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(orders); err != nil {
+		h.Helper.ServerError(w, err)
+		return
+	}
+}
+
+func (h *MovementOrderHandler) Post(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		FromId    int    `json:"fromId"`
 		ToId      int    `json:"toId"`
@@ -89,10 +129,22 @@ func (h *MovementOrderHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *MovementOrderHandler) Post(w http.ResponseWriter, r *http.Request) {
+func (h *MovementOrderHandler) Put(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (h *MovementOrderHandler) Put(w http.ResponseWriter, r *http.Request) {
+func (h *MovementOrderHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.URL.Query().Get("id"))
+	if err != nil {
+		h.Helper.ClientError(w, http.StatusBadRequest)
+		return
+	}
 
+	err = h.MovementOrderService.Delete(id)
+	if err != nil {
+		h.Helper.ServerError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
