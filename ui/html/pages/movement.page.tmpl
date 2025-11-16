@@ -125,6 +125,13 @@
         </div>
       </div>
 
+      <div class="mb-3" style="max-width:520px; display:flex; flex-direction:column; gap:6px;">
+        <label class="text-muted">Маршрут / транзит</label>
+        <select id="move-route-select" disabled>
+          <option value="">— маршрут не найден —</option>
+        </select>
+      </div>
+
       <!-- Информация о маршруте (заполняется автоматически) -->
       <div id="move-route-info" class="mb-4"
            style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;">
@@ -254,6 +261,20 @@
       </form>
     </div>
   </div>
+
+  <!-- Просмотр заказа перемещения -->
+  <div id="modal-move-view" class="modal hidden" aria-hidden="true">
+    <div class="modal-content" style="max-width: 1000px;">
+      <h3 class="mb-4">Просмотр заказа перемещения</h3>
+      <div id="move-view-body">
+        <!-- наполняется скриптом: шапка + карточки партий с таблицами -->
+      </div>
+      <div class="flex justify-end" style="gap:8px;">
+        <button type="button" class="btn" id="move-view-close">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
 
 </section>
 <script type="module" src="/static/js/pages/movement/main.js"></script>

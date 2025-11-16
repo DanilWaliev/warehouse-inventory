@@ -1,26 +1,18 @@
 // static/js/pages/movement/orders.js
-// Управление заказами перемещения с поддержкой ПАРТИЙ
-// - список заказов с раскрытием партий
-// - модалка создания заказа: партии + позиции с расчётом веса
-
 export function initOrders({ showToast, showConfirm }) {
-  // ==== API endpoints (как в прошлой версии) ====
-  const API_ORDERS   = '/api/move';                                  // GET list / POST create / DELETE ?id=
-  const API_STORAGES = '/api/storage?type=warehouse&inventory=false'; // GET склады
-  const API_ROUTES   = '/api/route';                                  // GET маршруты
-  const API_TMC      = '/api/tmc';                                    // GET ТМЦ (должны содержать Weight)
-
-  // ===== DOM (таблица заказов) =====
+  // ===== DOM =====
   const table = document.getElementById('table-move');
   const tbody = table ? document.getElementById('table-move-body') : null;
 
-  // ===== DOM (модалка создания заказа) =====
-  const modal       = document.getElementById('modal-move-create');
+  // Модалка создания заказа
+  const modalCreate = document.getElementById('modal-move-create');
   const selFrom     = document.getElementById('move-from');
   const selTo       = document.getElementById('move-to');
+  const selRoute    = document.getElementById('move-route-select'); // <== НОВЫЙ селект маршрутов (см. ниже, что добавить в HTML)
   const notesEl     = document.getElementById('move-notes');
+  const submitBtn   = document.getElementById('move-submit');
 
-  // Блок информации о маршруте
+  // Панель инфо по выбранному маршруту
   const routeInfo = {
     id:       document.getElementById('move-route-id'),
     name:     document.getElementById('move-route-name'),
@@ -29,15 +21,27 @@ export function initOrders({ showToast, showConfirm }) {
     capacity: document.getElementById('move-route-capacity'),
   };
 
-  // ===== Кэш справочников =====
-  const cache = {
-    warehouses: [],   // [{ID,Name,Location,...}]
-    routes:     [],   // [{ID, From:{ID,Name}, To:{ID,Name}, Transit:{ID,Name,Capacity}, Edh}]
-    components: [],   // [{ID,Name,Weight,...}]
-    compById:   new Map(), // ID -> component
+  // Контролы позиций (на этапе создания партиЙ не видно — только позиции заказа)
+  const items = {
+    body:   document.getElementById('move-items-body'),
+    empty:  document.getElementById('move-items-empty'),
+    addBtn: document.getElementById('move-add-item'),
   };
 
-  // ======================= Helpers (fetch) =======================
+  // Модалка просмотра заказа
+  const modalView  = document.getElementById('modal-move-view'); // <== НОВАЯ модалка (см. ниже, что добавить в HTML)
+  const viewBody   = document.getElementById('move-view-body');
+  const viewClose  = document.getElementById('move-view-close');
+
+  // ===== Кэш справочников =====
+  let cache = {
+    warehouses: [],   // [{ID,Name,Location,...}]
+    routes:     [],   // [{ID,From:{ID,Name},To:{ID,Name},Transit:{ID,Name,Capacity}, Edh}]
+    components: [],   // [{ID,Name,Weight}]
+    compById:   new Map(), // ID -> компонент
+  };
+
+  // ===== TOAST helpers =====
   function toastByStatus(res, fallback) {
     switch (res.status) {
       case 409: showToast?.("Конфликт данных"); break;
@@ -45,48 +49,58 @@ export function initOrders({ showToast, showConfirm }) {
       default:  showToast?.(fallback || "Ошибка запроса");
     }
   }
-
+  // Списки: 404 → пусто
   async function parseListGET(res, fallback) {
-    if (res.status === 404) return [];             // пусто без тоста
+    if (res.status === 404) return [];
     if (!res.ok) { toastByStatus(res, fallback); return []; }
     const ct = res.headers.get('Content-Type') || '';
     return ct.includes('application/json') ? await res.json() : [];
   }
-
+  // Прочие: тост на ошибки
   async function parseOrToast(res, fallback) {
     if (!res.ok) { toastByStatus(res, fallback); return null; }
     const ct = res.headers.get('Content-Type') || '';
     return ct.includes('application/json') ? await res.json() : true;
   }
 
+  // ===== API =====
   async function fetchOrders() {
-    const res = await fetch(API_ORDERS);
+    const res = await fetch('/api/move');
     return parseListGET(res, "Ошибка загрузки заказов");
   }
-
+  async function fetchOrderOne(id) {
+    const res = await fetch(`/api/move?id=${id}`);
+    return parseOrToast(res, "Не удалось загрузить заказ");
+  }
   async function deleteOrder(id) {
-    const res = await fetch(`${API_ORDERS}?id=${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/move?id=${id}`, { method: 'DELETE' });
     return parseOrToast(res, "Ошибка при удалении заказа");
+  }
+  // смена статуса (created -> running -> done)
+  async function updateOrderStatus(id, status) {
+    const res = await fetch(`/api/move?id=${encodeURIComponent(id)}&status=${encodeURIComponent(status)}`, {
+      method: 'PUT'
+    });
+    return parseOrToast(res, "Ошибка смены статуса");
   }
 
   async function fetchWarehouses() {
-    const res = await fetch(API_STORAGES);
+    const res = await fetch('/api/storage?type=warehouse&inventory=false');
     return parseListGET(res, "Ошибка загрузки складов");
   }
-
   async function fetchRoutes() {
-    const res = await fetch(API_ROUTES);
+    const res = await fetch('/api/route');
     return parseListGET(res, "Ошибка загрузки маршрутов");
   }
-
   async function fetchComponents() {
-    const res = await fetch(API_TMC);
+    const res = await fetch('/api/tmc');
     return parseListGET(res, "Ошибка загрузки ТМЦ");
   }
 
-  async function createOrder(payload) {
-    // payload: { fromId, toId, routeId, transitId, notes, batches: [{items:[{componentId,quantity}]}] }
-    const res = await fetch(API_ORDERS, {
+  // Комбинированное создание заказа с партиями
+  async function createOrderWithBatches(payload) {
+    // payload: { routeId, notes, batches: [ { items:[{componentId,quantity}] } ] }
+    const res = await fetch('/api/move', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -94,203 +108,133 @@ export function initOrders({ showToast, showConfirm }) {
     return parseOrToast(res, "Ошибка при создании заказа");
   }
 
-  // ======================= Helpers (UI/format) =======================
-  function fmtDate(val) {
-    if (!val) return '—';
+  // ===== Форматирование/утилиты =====
+  function fmtDate(d) {
+    if (!d) return '-';
     try {
-      const d = new Date(val);
-      if (isNaN(d)) return String(val);
-      return d.toLocaleString('ru-RU');
-    } catch { return String(val); }
+      const dt = new Date(d);
+      if (Number.isNaN(dt.getTime())) return String(d);
+      // 01.02.2025, 10:20:30
+      return dt.toLocaleString('ru-RU');
+    } catch { return String(d); }
   }
-  function monoID(id) { return `<span class="text-mono">#${id}</span>`; }
-  function statusBadge(status) {
-    switch (status) {
-      case 'done':    return `<span class="status-badge status-finished">Завершён</span>`;
-      case 'running': return `<span class="status-badge status-created">Отправлен</span>`;
-      case 'created':
-      default:        return `<span class="status-badge status-created">Создан</span>`;
+  function getStatus(o) {
+    switch (o.Status) {
+      case 'created': return 'Создан';
+      case 'running': return 'Отправлен';
+      case 'done':    return 'Завершён';
+      default:        return o.Status || 'Создан';
     }
   }
-
-  function getStatus(o) {
-    if (o.Status) return o.Status; // ожидаем 'created'|'running'|'done'
-    // запасной путь:
-    if (o.ActualArrivalDate)  return 'done';
-    if (o.ActualShipmentDate) return 'running';
-    return 'created';
-  }
-
-  function getBatchesCount(o) {
+  function batchesCount(o) {
     if (typeof o.BatchesCount === 'number') return o.BatchesCount;
     if (Array.isArray(o.Batches)) return o.Batches.length;
     return 0;
   }
+  function routeIdOf(o)   { return o.Route?.ID ?? o.RouteID ?? o.RouteId ?? '—'; }
+  function transitIdOf(o) { return o.Route?.Transit?.ID ?? o.TransitID ?? o.TransitId ?? '—'; }
 
-  function getRouteID(o)   { return o.Route?.ID ?? o.RouteID   ?? o.RouteId   ?? null; }
-  function getTransit(o)   { return o.Route?.Transit || null; }
+  // Вес позиции = Weight * qty
+  function itemWeight(componentId, qty) {
+    const comp = cache.compById.get(Number(componentId));
+    const w = comp?.Weight ?? 0;
+    return w * qty;
+  }
 
-  // ======================= Рендер списка заказов =======================
-  function renderBatchesDetailsRow(order) {
-    const colSpan = 8;
-    const batches = Array.isArray(order.Batches) ? order.Batches : [];
-
-    if (!batches.length) {
-      return `
-        <tr class="order-details-row hidden" data-details-for="${order.ID}">
-          <td colspan="${colSpan}" class="text-muted">Нет партий</td>
-        </tr>`;
-    }
-
-    // Посчитать вес позиции и партии
-    const batchCards = batches.map((b, idx) => {
-      const items = Array.isArray(b.Items) ? b.Items : [];
-      let totalWeight = 0;
-
-      const itemsHTML = items.length
-        ? `
-          <table class="table" style="margin-top:6px;">
-            <thead>
-              <tr>
-                <th>ТМЦ</th>
-                <th style="width:10ch;">Кол-во</th>
-                <th style="width:12ch;">Вес/ед.</th>
-                <th style="width:12ch;">Итого</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${items.map(it => {
-                const name = it.Component?.Name ?? '—';
-                const qty  = Number(it.Quantity ?? 0);
-                const w    = Number(it.Component?.Weight ?? 0);
-                const sum  = Math.round(qty * w * 100) / 100;
-                totalWeight += sum;
-                return `
-                  <tr>
-                    <td>${name}</td>
-                    <td>${qty}</td>
-                    <td>${w}</td>
-                    <td><strong>${sum}</strong></td>
-                  </tr>`;
-              }).join('')}
-            </tbody>
-          </table>`
-        : `<div class="text-muted">Нет позиций</div>`;
-
-      const totalHTML = `<div class="mt-2"><strong>Вес партии:</strong> ${Math.round(totalWeight * 100) / 100}</div>`;
-
-      return `
-        <div class="batch-card" style="border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-            <div><strong>Партия ${idx + 1}</strong></div>
-            <div>${statusBadge(b.Status)}</div>
-          </div>
-          ${itemsHTML}
-          ${totalHTML}
-        </div>`;
-    }).join('<div style="height:8px;"></div>');
-
-    return `
-      <tr class="order-details-row hidden" data-details-for="${order.ID}">
-        <td colspan="${colSpan}">
-          <div class="batches-wrap" style="display:grid;grid-template-columns:1fr;gap:8px;">
-            ${batchCards}
-          </div>
-        </td>
-      </tr>`;
+  // ===== Рендер таблицы заказов =====
+  function renderEmpty() {
+    if (!tbody) return;
+    tbody.innerHTML = `<tr><td colspan="8" class="text-muted">Нет заказов</td></tr>`;
   }
 
   function renderList(list) {
     if (!tbody) return;
     tbody.innerHTML = '';
-
-    if (!Array.isArray(list) || list.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="8" class="text-muted">Нет заказов</td></tr>`;
-      return;
-    }
+    if (!Array.isArray(list) || list.length === 0) { renderEmpty(); return; }
 
     for (const o of list) {
-      const id           = o.ID ?? o.Id ?? '—';
-      const routeID      = getRouteID(o);
-      const transit      = getTransit(o);
-      const batchesCount = getBatchesCount(o);
-      const statusText   = getStatus(o);
-
-      let transitCell = '—';
-      if (transit?.ID) {
-        const cap = transit.Capacity;
-        transitCell = cap != null && cap !== ''
-          ? `${monoID(transit.ID)}&nbsp;<span class="text-muted">(вмест.: ${cap})</span>`
-          : `${monoID(transit.ID)}`;
-      }
+      const id        = o.ID ?? o.Id ?? '—';
+      const rID       = routeIdOf(o);
+      const tID       = transitIdOf(o);
+      const bCount    = batchesCount(o);
+      const statusTxt = getStatus(o);
+      const createdAt = fmtDate(o.CreatedAt);
+      const closedAt  = fmtDate(o.ClosedAt ?? o.Aad ?? null);
 
       const tr = document.createElement('tr');
-      tr.className = 'order-row';
-      tr.setAttribute('data-id', id);
       tr.innerHTML = `
-        <td style="width:12ch;">${monoID(id)}</td>
-        <td style="width:12ch;">${routeID ? monoID(routeID) : '—'}</td>
-        <td style="width:12ch;">${transitCell}</td>
-        <td style="width:12ch;">${batchesCount}</td>
-        <td style="width:22ch;">${statusBadge(statusText)}</td>
-        <td>${fmtDate(o.CreatedAt)}</td>
-        <td>${fmtDate(o.ClosedAt ?? o.ActualArrivalDate)}</td>
+        <td style="width:12ch;">#${id}</td>
+        <td style="width:12ch;">${rID}</td>
+        <td style="width:12ch;">${tID}</td>
+        <td style="width:12ch;">${bCount}</td>
+        <td style="width:22ch;">${statusTxt}</td>
+        <td>${createdAt}</td>
+        <td>${closedAt}</td>
         <td>
-          <button class="btn btn-secondary btn-toggle" data-id="${id}">Партии</button>
+          <button class="btn btn-secondary btn-view" data-id="${id}">Просмотр</button>
+          ${statusBtnHtml(o)}
           <button class="btn btn-danger btn-delete" data-id="${id}">Удалить</button>
         </td>
       `;
+
+      // Просмотр
+      tr.querySelector('.btn-view')?.addEventListener('click', () => openView(id));
+
+      // Отправить/Принять
+      const btnSend = tr.querySelector('.btn-send');
+      const btnRecv = tr.querySelector('.btn-receive');
+      if (btnSend) {
+        btnSend.addEventListener('click', async () => {
+          if (!(await showConfirm?.('Отправить заказ?', 'Подтверждение'))) return;
+          const ok = await updateOrderStatus(id, 'running');
+          if (!ok) return;
+          await load();
+          showToast?.('Заказ отправлен', 'success');
+        });
+      }
+      if (btnRecv) {
+        btnRecv.addEventListener('click', async () => {
+          if (!(await showConfirm?.('Принять заказ?', 'Подтверждение'))) return;
+          const ok = await updateOrderStatus(id, 'done');
+          if (!ok) return;
+          await load();
+          showToast?.('Заказ принят', 'success');
+        });
+      }
+
+      // Удаление
+      tr.querySelector('.btn-delete')?.addEventListener('click', async () => {
+        if (!(await showConfirm?.('Удалить заказ?', 'Подтверждение'))) return;
+        const ok = await deleteOrder(id);
+        if (!ok) return;
+        await load();
+        showToast?.('Заказ удалён', 'success');
+      });
+
       tbody.appendChild(tr);
-
-      // строка деталей
-      const rowHTML = renderBatchesDetailsRow(o);
-      const tmp = document.createElement('tbody');
-      tmp.innerHTML = rowHTML;
-      tbody.appendChild(tmp.firstElementChild);
     }
   }
 
-  // раскрытие партий
-  function toggleDetails(orderId, forceOpen) {
-    const row = tbody?.querySelector(`tr.order-details-row[data-details-for="${orderId}"]`);
-    if (!row) return;
-    const isHidden = row.classList.contains('hidden');
-    const open = (forceOpen === undefined) ? isHidden : !!forceOpen;
-    row.classList.toggle('hidden', !open);
+  function statusBtnHtml(order) {
+    switch (order.Status) {
+      case 'created':
+        return `<button class="btn btn-primary btn-send" data-id="${order.ID}">Отправить</button>`;
+      case 'running':
+        return `<button class="btn btn-primary btn-receive" data-id="${order.ID}">Принять</button>`;
+      case 'done':
+      default:
+        return ``;
+    }
   }
 
-  tbody?.addEventListener('click', async (e) => {
-    const del = e.target.closest('.btn-delete');
-    if (del) {
-      const id = del.getAttribute('data-id');
-      if (!(await showConfirm?.('Удалить заказ перемещения?', 'Подтверждение'))) return;
-      const ok = await deleteOrder(id);
-      if (!ok) return;
-      await load();
-      showToast?.('Заказ удалён', 'success');
-      return;
-    }
-    const tog = e.target.closest('.btn-toggle');
-    if (tog) {
-      toggleDetails(tog.getAttribute('data-id'));
-      return;
-    }
-    const tr = e.target.closest('tr.order-row');
-    if (tr && !e.target.closest('td:last-child')) {
-      toggleDetails(tr.getAttribute('data-id'));
-    }
-  });
-
-  // ======================= Маршруты (подбор) =======================
-  function findRoute(fromId, toId) {
-    if (!Array.isArray(cache.routes)) return null;
+  // ===== Получение маршрутов по паре (from, to) и заполнение селекта =====
+  function findRoutesByPair(fromId, toId) {
     const f = Number(fromId), t = Number(toId);
-    return cache.routes.find(r =>
+    return (cache.routes || []).filter(r =>
       (r.From?.ID ?? r.FromID) === f && (r.To?.ID ?? r.ToID) === t
-    ) || null;
+    );
   }
-
-  function setRouteInfoUI(route) {
+  function setRouteInfoByObj(route) {
     if (!route) {
       routeInfo.id.value       = '';
       routeInfo.name.textContent     = '—';
@@ -299,202 +243,19 @@ export function initOrders({ showToast, showConfirm }) {
       routeInfo.capacity.textContent = '—';
       return;
     }
-    const rid   = route.ID ?? route.Route_ID ?? '';
-    const name  = route.Name ?? `${route.From?.Name ?? `#${route.From?.ID ?? ''}`} → ${route.To?.Name ?? `#${route.To?.ID ?? ''}`}`;
-    const tr    = route.Transit?.Name ?? (route.Transit?.ID ? `#${route.Transit.ID}` : '—');
-    const eta   = (route.Edh != null) ? `${route.Edh} ч` : '—';
-    const cap   = (route.Transit?.Capacity != null) ? `${route.Transit.Capacity} кг` : '—';
+    const nm  = route.Name ?? `${route.From?.Name ?? `#${route.From?.ID ?? ''}`} → ${route.To?.Name ?? `#${route.To?.ID ?? ''}`}`;
+    const eta = (route.Edh ?? route.ETAHours ?? route.etaHours ?? '—') + (route.Edh || route.ETAHours ? ' ч' : '');
+    const cap = route.Transit?.Capacity != null ? `${route.Transit.Capacity} кг` : '—';
 
-    routeInfo.id.value           = String(rid);
-    routeInfo.name.textContent   = name;
-    routeInfo.tr.textContent     = tr;
-    routeInfo.eta.textContent    = eta;
-    routeInfo.capacity.textContent = cap;
+    routeInfo.id.value            = String(route.ID ?? route.Route_ID ?? '');
+    routeInfo.name.textContent    = nm;
+    routeInfo.tr.textContent      = route.Transit?.Name ?? (route.Transit?.ID ? `#${route.Transit.ID}` : '—');
+    routeInfo.eta.textContent     = String(eta);
+    routeInfo.capacity.textContent= cap;
   }
-
-  // ======================= МОДАЛКА: партии =======================
-  // Вёрстка модалки у тебя: мы заменяем «Позиции» на контейнер партий:
-  // <div id="batches-wrap"></div> и кнопка «+ Партия»
-  let batchesWrap = document.getElementById('batches-wrap');
-  let addBatchBtn = document.getElementById('move-add-batch');
-  let submitBtn   = document.getElementById('move-submit');
-
-  // Если контейнеров ещё нет в шаблоне — создадим динамически вместо старого блока "Позиции"
-  (function ensureBatchesArea() {
-    if (!batchesWrap) {
-      const card = document.querySelector('#move-items-table')?.closest('.card') || null;
-      if (card) {
-        // Перестраиваем карточку под партии
-        card.innerHTML = `
-          <h4 class="mb-4" style="display:flex;align-items:center;justify-content:space-between;">
-            Партии
-            <button type="button" class="btn btn-primary mb-4" id="move-add-batch" title="Добавить партию">＋ Партия</button>
-          </h4>
-          <div id="batches-wrap" class="batches-wrap" style="display:grid;gap:12px;"></div>
-        `;
-        batchesWrap = card.querySelector('#batches-wrap');
-        addBatchBtn = card.querySelector('#move-add-batch');
-      }
-    }
-  })();
-
-  // Внутри партии — отдельная таблица позиций
-  function componentOptionsHTML() {
-    if (!Array.isArray(cache.components) || cache.components.length === 0) {
-      return `<option value="">— нет ТМЦ —</option>`;
-    }
-    return cache.components.map(c => `<option value="${c.ID}">${c.Name}</option>`).join('');
-  }
-
-  function makeBatchDOM(batchIndex) {
-    const el = document.createElement('div');
-    el.className = 'batch-card';
-    el.style.cssText = 'border:1px solid #e5e7eb;border-radius:8px;padding:12px;';
-
-    el.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-        <div><strong>Партия <span class="batch-num">${batchIndex + 1}</span></strong></div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <div class="text-muted">Вес партии: <strong class="batch-weight">0</strong></div>
-          <button type="button" class="btn btn-danger btn-batch-del" title="Удалить партию">×</button>
-        </div>
-      </div>
-      <div class="table-wrap" style="margin-top:8px;">
-        <table class="table batch-items-table">
-          <thead>
-            <tr>
-              <th>ТМЦ</th>
-              <th style="width:10ch;">Кол-во</th>
-              <th style="width:12ch;">Вес/ед.</th>
-              <th style="width:12ch;">Итого</th>
-              <th style="width:10ch;">Действия</th>
-            </tr>
-          </thead>
-          <tbody class="batch-items-body">
-          </tbody>
-        </table>
-      </div>
-      <div class="mt-2">
-        <button type="button" class="btn btn-primary btn-item-add">+ Позиция</button>
-      </div>
-    `;
-    return el;
-  }
-
-  function addBatch() {
-    if (!batchesWrap) return;
-    const index = batchesWrap.querySelectorAll('.batch-card').length;
-    const card = makeBatchDOM(index);
-    batchesWrap.appendChild(card);
-    // первая строка
-    addItemRowToBatch(card);
-    wireBatchCard(card);
-    renumberBatches();
-  }
-
-  function renumberBatches() {
-    batchesWrap?.querySelectorAll('.batch-card').forEach((card, idx) => {
-      const numEl = card.querySelector('.batch-num');
-      if (numEl) numEl.textContent = String(idx + 1);
-    });
-  }
-
-  function addItemRowToBatch(card) {
-    const body = card.querySelector('.batch-items-body');
-    if (!body) return;
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td><select class="bi-component" required>${componentOptionsHTML()}</select></td>
-      <td><input type="number" class="bi-qty" min="1" step="1" value="1" required></td>
-      <td class="bi-unit">0</td>
-      <td class="bi-total"><strong>0</strong></td>
-      <td><button type="button" class="btn btn-danger bi-del">×</button></td>
-    `;
-    body.appendChild(tr);
-    // начальный перерасчёт
-    recalcRow(tr);
-    recalcBatch(card);
-  }
-
-  function recalcRow(tr) {
-    const sel = tr.querySelector('.bi-component');
-    const qtyEl = tr.querySelector('.bi-qty');
-    const unitEl = tr.querySelector('.bi-unit');
-    const totalEl = tr.querySelector('.bi-total > strong');
-
-    const compId = parseInt(sel?.value || '0', 10);
-    const qty = parseInt(qtyEl?.value || '0', 10);
-    const comp = cache.compById.get(compId);
-    const w = comp ? Number(comp.Weight || 0) : 0;
-    const sum = Math.round(qty * w * 100) / 100;
-
-    if (unitEl) unitEl.textContent = String(w);
-    if (totalEl) totalEl.textContent = String(sum);
-  }
-
-  function recalcBatch(card) {
-    const totals = [...card.querySelectorAll('.bi-total > strong')]
-      .map(el => Number(el.textContent || 0));
-    const s = totals.reduce((a,b)=>a+b,0);
-    const weightEl = card.querySelector('.batch-weight');
-    if (weightEl) weightEl.textContent = String(Math.round(s * 100) / 100);
-  }
-
-  function wireBatchCard(card) {
-    // добавить позицию
-    card.querySelector('.btn-item-add')?.addEventListener('click', () => {
-      addItemRowToBatch(card);
-    });
-
-    // удалить партию
-    card.querySelector('.btn-batch-del')?.addEventListener('click', () => {
-      card.remove();
-      renumberBatches();
-    });
-
-    // делегирование по строкам
-    const tbody = card.querySelector('.batch-items-body');
-    tbody?.addEventListener('change', (e) => {
-      if (e.target.matches('.bi-component') || e.target.matches('.bi-qty')) {
-        const tr = e.target.closest('tr');
-        recalcRow(tr);
-        recalcBatch(card);
-      }
-    });
-    tbody?.addEventListener('input', (e) => {
-      if (e.target.matches('.bi-qty')) {
-        const tr = e.target.closest('tr');
-        recalcRow(tr);
-        recalcBatch(card);
-      }
-    });
-    tbody?.addEventListener('click', (e) => {
-      const del = e.target.closest('.bi-del');
-      if (del) {
-        const tr = del.closest('tr');
-        tr?.remove();
-        recalcBatch(card);
-      }
-    });
-  }
-
-  // ======================= OPEN CREATE (публичный) =======================
-  function showModal() {
-    if (!modal) return;
-    modal.classList.remove('hidden');
-    modal.setAttribute('aria-hidden', 'false');
-    document.body.style.overflow = 'hidden';
-  }
-  function hideModal() {
-    if (!modal) return;
-    modal.classList.add('hidden');
-    modal.setAttribute('aria-hidden', 'true');
-    document.body.style.overflow = '';
-  }
-
   function fillWarehouseSelect(sel, list) {
     if (!sel) return;
-    if (!Array.isArray(list) || list.length === 0) {
+    if (!Array.isArray(list) || !list.length) {
       sel.innerHTML = `<option value="">— нет складов —</option>`;
       return;
     }
@@ -502,112 +263,356 @@ export function initOrders({ showToast, showConfirm }) {
       `<option value="${w.ID}">${w.Name}${w.Location ? ' — ' + w.Location : ''}</option>`
     ).join('');
   }
-
-  function onWarehousesChangeRoute() {
-    const f = parseInt(selFrom?.value || '0', 10);
-    const t = parseInt(selTo?.value   || '0', 10);
-    if (!f || !t || f === t) { setRouteInfoUI(null); return; }
-    const route = findRoute(f, t);
-    setRouteInfoUI(route || null);
+  function fillComponentsSelect(sel, list) {
+    if (!sel) return;
+    if (!Array.isArray(list) || !list.length) {
+      sel.innerHTML = `<option value="">— нет ТМЦ —</option>`;
+      return;
+    }
+    sel.innerHTML = list.map(c => `<option value="${c.ID}">${c.Name}</option>`).join('');
+  }
+  function fillRoutesSelect(sel, routes) {
+    if (!sel) return;
+    if (!Array.isArray(routes) || !routes.length) {
+      sel.innerHTML = `<option value="">— маршрут не найден —</option>`;
+      sel.disabled = true;
+      return;
+    }
+    sel.disabled = false;
+    sel.innerHTML = routes.map(r => {
+      const tr = r.Transit?.Name ? `${r.Transit.Name}` : (r.Transit?.ID ? `#${r.Transit.ID}` : '—');
+      const eta = r.Edh ?? r.ETAHours ?? '-';
+      const cap = r.Transit?.Capacity != null ? r.Transit.Capacity : '—';
+      const label = `${tr} · ${eta} ч · ${cap} кг`;
+      return `<option value="${r.ID}">${label}</option>`;
+    }).join('');
+  }
+  function routeById(rid) {
+    const id = Number(rid);
+    return (cache.routes || []).find(r => (r.ID ?? r.Route_ID) === id) || null;
   }
 
+  // ===== Позиции (создание) =====
+  function toggleItemsEmpty() {
+    if (!items.body || !items.empty) return;
+    const hasRows = items.body.querySelector('tr') != null;
+    items.empty.style.display = hasRows ? 'none' : '';
+  }
+  function addItemRow() {
+    if (!items.body) return;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>
+        <select class="move-item-component" required></select>
+      </td>
+      <td>
+        <input type="number" class="move-item-qty" min="1" step="1" value="1" required>
+      </td>
+      <td>
+        <button type="button" class="btn btn-danger btn-remove">Удалить</button>
+      </td>
+    `;
+    items.body.appendChild(tr);
+    const sel = tr.querySelector('.move-item-component');
+    fillComponentsSelect(sel, cache.components);
+    tr.querySelector('.btn-remove')?.addEventListener('click', () => {
+      tr.remove();
+      toggleItemsEmpty();
+    });
+    toggleItemsEmpty();
+  }
+  function collectItems() {
+    if (!items.body) return [];
+    const rows = [...items.body.querySelectorAll('tr')];
+    const out = [];
+    for (const r of rows) {
+      const sel = r.querySelector('.move-item-component');
+      const qtyEl = r.querySelector('.move-item-qty');
+      const cid = parseInt(sel?.value || '0', 10);
+      const qty = parseInt(qtyEl?.value || '0', 10);
+      if (cid > 0 && Number.isFinite(qty) && qty > 0) {
+        out.push({ componentId: cid, quantity: qty });
+      }
+    }
+    return out;
+  }
+
+  // ===== Автосплит на партии по capacity (вес) =====
+  function totalWeightOfItems(itemsArr) {
+    return itemsArr.reduce((sum, it) => sum + itemWeight(it.componentId, it.quantity), 0);
+  }
+
+  // Разбиваем greedy: идём по позициям, наполняя текущую партию до capacity, переносим остатки в следующую
+  function splitIntoBatches(itemsArr, capacity) {
+    const batches = [];
+    let cur = []; // items текущей партии
+    let curW = 0;
+
+    // клонируем, чтобы не портить исходные
+    const queue = itemsArr.map(it => ({ componentId: it.componentId, quantity: it.quantity }));
+
+    while (queue.length) {
+      const it = queue.shift();
+      const comp = cache.compById.get(it.componentId);
+      const wPerOne = comp?.Weight ?? 0;
+      if (wPerOne <= 0) {
+        // нулевой вес — не влияет на сплит, кидаем всё в текущую
+        cur.push({ componentId: it.componentId, quantity: it.quantity });
+        continue;
+      }
+
+      let remainQty = it.quantity;
+      while (remainQty > 0) {
+        const canPutByWeight = Math.floor((capacity - curW) / wPerOne);
+        if (canPutByWeight <= 0) {
+          // текущая партия полна — открываем новую
+          if (cur.length) batches.push({ items: cur });
+          cur = [];
+          curW = 0;
+          continue;
+        }
+
+        const put = Math.min(remainQty, canPutByWeight);
+        cur.push({ componentId: it.componentId, quantity: put });
+        curW += put * wPerOne;
+        remainQty -= put;
+
+        if (remainQty > 0 && curW + wPerOne > capacity) {
+          // новая партия
+          batches.push({ items: cur });
+          cur = [];
+          curW = 0;
+        }
+      }
+    }
+    if (cur.length) batches.push({ items: cur });
+    return batches;
+  }
+
+  // ===== Открытие модалки создания заказа =====
   async function openCreate() {
-    // 1) Ленивая загрузка справочников
+    // lazy-load справочники
     if (!cache.warehouses.length) cache.warehouses = await fetchWarehouses();
     if (!cache.routes.length)     cache.routes     = await fetchRoutes();
-    if (!cache.components.length) {
-      cache.components = await fetchComponents();
-      cache.compById.clear();
-      for (const c of cache.components) cache.compById.set(c.ID, c);
-    }
+    if (!cache.components.length) cache.components = await fetchComponents();
 
-    // 2) Селекты складов
+    // индекс компонентов по ID
+    cache.compById = new Map(cache.components.map(c => [Number(c.ID), c]));
+
+    // заполнить склады
     fillWarehouseSelect(selFrom, cache.warehouses);
     fillWarehouseSelect(selTo,   cache.warehouses);
 
-    // 3) Сброс маршрута и заметок
-    notesEl && (notesEl.value = '');
-    setRouteInfoUI(null);
-
-    // 4) Очистить партии и создать одну по умолчанию
-    if (batchesWrap) {
-      batchesWrap.innerHTML = '';
-      addBatch();
+    // очистить селект маршрутов
+    if (selRoute) {
+      selRoute.innerHTML = `<option value="">— выберите склады —</option>`;
+      selRoute.disabled = true;
     }
 
-    // 5) Подписки (не дублируем: перед этим снимем)
-    selFrom?.removeEventListener('change', onWarehousesChangeRoute);
-    selTo?.removeEventListener('change', onWarehousesChangeRoute);
-    selFrom?.addEventListener('change', onWarehousesChangeRoute);
-    selTo?.addEventListener('change', onWarehousesChangeRoute);
+    // сброс позиций и добавление первой строки
+    items.body.innerHTML = '';
+    addItemRow();
 
-    addBatchBtn?.removeEventListener('click', addBatch);
-    addBatchBtn?.addEventListener('click', addBatch);
+    // сброс заметок и инфо
+    notesEl.value = '';
+    setRouteInfoByObj(null);
 
-    // 6) Показать модалку
-    showModal();
+    // обработчики выбора from/to → фильтрация маршрутов
+    function onChangeEndpoints() {
+      const f = parseInt(selFrom?.value || '0', 10);
+      const t = parseInt(selTo?.value   || '0', 10);
+      if (!f || !t || f === t) {
+        if (selRoute) {
+          selRoute.innerHTML = `<option value="">— маршрут не найден —</option>`;
+          selRoute.disabled = true;
+        }
+        setRouteInfoByObj(null);
+        return;
+      }
+      const routes = findRoutesByPair(f, t);
+      fillRoutesSelect(selRoute, routes);
+      if (routes.length) {
+        // выбрать первый по умолчанию
+        selRoute.value = String(routes[0].ID);
+        setRouteInfoByObj(routes[0]);
+      } else {
+        setRouteInfoByObj(null);
+      }
+    }
+    selFrom?.addEventListener('change', onChangeEndpoints, { once: true });
+    selTo?.addEventListener('change', onChangeEndpoints,   { once: true });
+
+    // изменение выбранного маршрута
+    selRoute?.addEventListener('change', () => {
+      const r = routeById(selRoute.value);
+      setRouteInfoByObj(r || null);
+    });
+
+    // кнопка “+ позиция”
+    items.addBtn?.addEventListener('click', addItemRow);
+
+    showModal(modalCreate);
   }
 
-  // ======================= SUBMIT (создание заказа) =======================
+  // ===== Сабмит создания: автосплит + POST =====
   submitBtn?.addEventListener('click', async () => {
     const fromId = parseInt(selFrom?.value || '0', 10);
     const toId   = parseInt(selTo?.value   || '0', 10);
     if (!fromId || !toId) { showToast?.('Выберите склады отправителя и получателя'); return; }
     if (fromId === toId)  { showToast?.('Отправитель и получатель не могут совпадать'); return; }
 
-    const route = findRoute(fromId, toId);
-    if (!route) { showToast?.('Маршрут между выбранными складами не найден'); return; }
+    const routeId = parseInt((selRoute?.value || '0'), 10);
+    const route   = routeById(routeId);
+    if (!routeId || !route) { showToast?.('Маршрут не выбран'); return; }
 
-    // Собираем партии -> позиции
-    const batchCards = [...(batchesWrap?.querySelectorAll('.batch-card') || [])];
-    if (batchCards.length === 0) { showToast?.('Добавьте хотя бы одну партию'); return; }
+    const itemsPayload = collectItems();
+    if (!itemsPayload.length) { showToast?.('Добавьте хотя бы одну позицию'); return; }
 
-    const batches = [];
-    for (const card of batchCards) {
-      const rows = [...card.querySelectorAll('.batch-items-body tr')];
-      if (rows.length === 0) { showToast?.('В партии должна быть хотя бы одна позиция'); return; }
+    // capacity из выбранного маршрута
+    const capacity = Number(route.Transit?.Capacity ?? 0);
+    const totalW   = totalWeightOfItems(itemsPayload);
 
-      const items = [];
-      for (const tr of rows) {
-        const sel = tr.querySelector('.bi-component');
-        const qtyEl = tr.querySelector('.bi-qty');
-        const cid = parseInt(sel?.value || '0', 10);
-        const qty = parseInt(qtyEl?.value || '0', 10);
-        if (cid <= 0 || !Number.isFinite(qty) || qty <= 0) {
-          showToast?.('Заполните корректно позиции партий'); return;
-        }
-        items.push({ componentId: cid, quantity: qty });
-      }
-      batches.push({ items });
+    let batches;
+    if (capacity > 0 && totalW > capacity) {
+      const minCount = Math.ceil(totalW / capacity);
+      const ok = await showConfirm?.(
+        `Суммарный вес ${totalW.toFixed(2)} кг превышает вместимость транзита ${capacity} кг. ` +
+        `Предлагаю разделить на ${minCount} парти${minCount===1?'ю':'и'}. Разделить?`,
+        'Автосплит по вместимости'
+      );
+      if (!ok) return;
+      batches = splitIntoBatches(itemsPayload, capacity);
+    } else {
+      // всё в одну партию
+      batches = [{ items: itemsPayload }];
     }
 
     const payload = {
-      fromId,
-      toId,
-      routeId:   route.ID ?? route.Route_ID,
-      transitId: route.Transit?.ID ?? route.TransitID,
-      notes:     String(notesEl?.value || '').trim(),
-      batches,   // [{items:[{componentId,quantity}]}]
+      routeId: routeId,
+      notes: String(notesEl?.value || '').trim(),
+      batches // [{items:[{componentId,quantity}]}...]
     };
 
-    const ok = await createOrder(payload);
+    const ok = await createOrderWithBatches(payload);
     if (!ok) return;
-    hideModal();
+    hideModal(modalCreate);
     await load();
     showToast?.('Заказ создан', 'success');
   });
 
-  // ======================= Публичный API =======================
+  // ===== Просмотр заказа (модалка) =====
+  async function openView(id) {
+    const data = await fetchOrderOne(id);
+    if (!data) return;
+
+    // сервер может вернуть массив из одного элемента (как в примере)
+    const order = Array.isArray(data) ? data[0] : data;
+
+    // посчитаем веса: по позициям партии, по партии и по заказу
+    const batches = Array.isArray(order.Batches) ? order.Batches : [];
+    const rows = [];
+    let orderWeight = 0;
+
+    for (const b of batches) {
+      let batchWeight = 0;
+      const itemsRows = [];
+      for (const it of (b.Items || [])) {
+        const cid = it.Component?.ID ?? it.Component_ID ?? it.componentId;
+        const qty = it.Quantity ?? 0;
+        const w   = (it.Component?.Weight != null) ? it.Component.Weight : (cache.compById.get(Number(cid))?.Weight ?? 0);
+        const iw  = w * qty;
+        batchWeight += iw;
+        itemsRows.push(`
+          <tr>
+            <td>${it.Component?.Name ?? `#${cid}`}</td>
+            <td style="text-align:right">${w}</td>
+            <td style="text-align:right">${qty}</td>
+            <td style="text-align:right">${iw.toFixed(2)}</td>
+          </tr>
+        `);
+      }
+      orderWeight += batchWeight;
+      rows.push(`
+        <div class="card mb-3">
+          <div class="flex justify-between items-center" style="padding:8px 12px;">
+            <div><strong>Партия #${b.ID}</strong> — статус: ${getStatus({Status:b.Status})}</div>
+            <div><strong>Вес партии:</strong> ${batchWeight.toFixed(2)} кг</div>
+          </div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>ТМЦ</th>
+                  <th style="width:12ch;text-align:right">Вес, кг</th>
+                  <th style="width:12ch;text-align:right">Кол-во</th>
+                  <th style="width:14ch;text-align:right">Итого, кг</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsRows.join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `);
+    }
+
+    // Шапка заказа
+    const r = order.Route || {};
+    const headHtml = `
+      <div class="mb-3">
+        <div><strong>ID заказа:</strong> #${order.ID}</div>
+        <div><strong>Маршрут:</strong> ${r.From?.Name ?? `#${r.From?.ID ?? ''}`} → ${r.To?.Name ?? `#${r.To?.ID ?? ''}`}</div>
+        <div><strong>Транзит:</strong> ${r.Transit?.Name ?? `#${r.Transit?.ID ?? ''}`}</div>
+        <div><strong>Время (Edh):</strong> ${r.Edh ?? '-' } ч</div>
+        <div><strong>Статус:</strong> ${getStatus(order)}</div>
+        <div><strong>Создан:</strong> ${fmtDate(order.CreatedAt)}</div>
+        <div><strong>Ожидаемое прибытие:</strong> ${fmtDate(order.Ead)}</div>
+        <div><strong>Отправлен:</strong> ${fmtDate(order.Asd)}</div>
+        <div><strong>Получен:</strong> ${fmtDate(order.Aad)}</div>
+        <div><strong>Заметки:</strong> ${order.Notes ?? ''}</div>
+        <div class="mt-2"><strong>Вес заказа:</strong> ${orderWeight.toFixed(2)} кг</div>
+      </div>
+    `;
+
+    if (viewBody) {
+      viewBody.innerHTML = headHtml + rows.join('');
+    }
+    showModal(modalView);
+  }
+
+  // ===== Окна =====
+  function showModal(modalEl) {
+    if (!modalEl) return;
+    modalEl.classList.remove('hidden');
+    modalEl.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+  function hideModal(modalEl) {
+    if (!modalEl) return;
+    modalEl.classList.add('hidden');
+    modalEl.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  }
+  viewClose?.addEventListener('click', () => hideModal(modalView));
+
+  // ===== Загрузка таблицы =====
   async function load() {
     if (!tbody) return;
     tbody.innerHTML = '';
     try {
-      const list = await fetchOrders(); // [] при 404
+      // кэш компонентов нужен, чтобы корректно показать веса при просмотре (если сервер не прислал Weight)
+      if (!cache.components.length) {
+        cache.components = await fetchComponents();
+        cache.compById = new Map(cache.components.map(c => [Number(c.ID), c]));
+      }
+      const list = await fetchOrders();
       renderList(list);
     } catch {
-      tbody.innerHTML = `<tr><td colspan="8" class="text-muted">Нет заказов</td></tr>`;
+      renderEmpty();
     }
   }
 
+  // публичные методы
   return { load, openCreate };
 }
