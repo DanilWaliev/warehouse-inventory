@@ -8,12 +8,14 @@ import (
 type MovementOrderService struct {
 	movementOrderModel *mysql.MovementOrderModel
 	routeModel         *mysql.RouteModel
+	componentModel     *mysql.ComponentModel
 }
 
-func NewMovementOrderService(movementOrderModel *mysql.MovementOrderModel, routeModel *mysql.RouteModel) *MovementOrderService {
+func NewMovementOrderService(movementOrderModel *mysql.MovementOrderModel, routeModel *mysql.RouteModel, componentModel *mysql.ComponentModel) *MovementOrderService {
 	return &MovementOrderService{
 		movementOrderModel: movementOrderModel,
 		routeModel:         routeModel,
+		componentModel:     componentModel,
 	}
 }
 
@@ -60,6 +62,22 @@ func (s *MovementOrderService) ReadAll() ([]*models.MovementOrder, error) {
 }
 
 func (s *MovementOrderService) Create(order *models.MovementOrder) error {
+	route, err := s.routeModel.SelectByID(order.Route.ID)
+	if err != nil {
+		return err
+	}
+	order.Route = *route
+
+	for _, batch := range order.Batches {
+		for _, item := range batch.Items {
+			component, err := s.componentModel.SelectByID(item.Component.ID)
+			if err != nil {
+				return nil
+			}
+			item.Component = *component
+		}
+	}
+
 	return s.movementOrderModel.Insert(order)
 }
 
