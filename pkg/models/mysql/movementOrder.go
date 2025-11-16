@@ -3,6 +3,7 @@ package mysql
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 	"warehouse-inventory/pkg/models"
 )
@@ -183,6 +184,177 @@ func (m *MovementOrderModel) loadBatches(dbq interface {
 	}
 
 	return batches, nil
+}
+
+// возвращает FromSite_ID, ToSite_ID, TransitSite_ID для заказа
+func getRouteSiteIDsByOrderIDTx(tx *sql.Tx, orderID int) (fromID, toID, transitID int, err error) {
+	var routeID sql.NullInt64
+	if err = tx.QueryRow(`
+		SELECT Route_ID FROM movementorder WHERE Order_ID = ? FOR UPDATE
+	`, orderID).Scan(&routeID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, 0, 0, models.ErrNoRecord
+		}
+		return
+	}
+	if !routeID.Valid {
+		return 0, 0, 0, fmt.Errorf("order %d has NULL route_id", orderID)
+	}
+
+	if err = tx.QueryRow(`
+		SELECT FromSite_ID, ToSite_ID, TransitSite_ID
+		FROM movementroute
+		WHERE Route_ID = ?
+	`, int(routeID.Int64)).Scan(&fromID, &toID, &transitID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, 0, 0, models.ErrNoRecord
+		}
+		return
+	}
+	return
+}
+
+// собирает количество по компонентам внутри партии
+func sumBatchItemsTx(tx *sql.Tx, batchID int) (map[int]int, error) {
+	rows, err := tx.Query(`
+		SELECT Component_ID, Quantity
+		FROM movementorderbatchitem
+		WHERE MovementOrderBatch_ID = ?
+	`, batchID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make(map[int]int, 16)
+	for rows.Next() {
+		var cid, qty int
+		if err := rows.Scan(&cid, &qty); err != nil {
+			return nil, err
+		}
+		out[cid] += qty
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// проверка вместимости транзита по весу
+func checkTransitCapacityByWeightTx(tx *sql.Tx, transitID int, compQty map[int]int) error {
+	// грузим суммарный вес партии
+	var totalKg float64
+	for compID, qty := range compQty {
+		var w sql.NullFloat64
+		if err := tx.QueryRow(`
+			SELECT Weight FROM component WHERE Component_ID = ?
+		`, compID).Scan(&w); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("component %d not found", compID)
+			}
+			return err
+		}
+		if !w.Valid {
+			continue
+		}
+		totalKg += w.Float64 * float64(qty)
+	}
+
+	// грузим capacity транзита
+	var capacity sql.NullFloat64
+	if err := tx.QueryRow(`
+		SELECT Capacity FROM transitstorage WHERE StorageSite_ID = ?
+	`, transitID).Scan(&capacity); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			// если записи нет — считаем без ограничения
+			return nil
+		}
+		return err
+	}
+	if capacity.Valid && totalKg > capacity.Float64+1e-9 {
+		return fmt.Errorf("transit capacity exceeded: need %.2f kg, capacity %.2f kg", totalKg, capacity.Float64)
+	}
+	return nil
+}
+
+// перемещает stock: src -> dst (с проверкой остатков на src)
+func moveStockTx(tx *sql.Tx, srcStorageID, dstStorageID int, compQty map[int]int) error {
+	if srcStorageID == dstStorageID {
+		return nil
+	}
+	for compID, qty := range compQty {
+		if qty <= 0 {
+			continue
+		}
+		// 1) проверяем и уменьшаем на источнике
+		var cur int
+		if err := tx.QueryRow(`
+			SELECT Quantity FROM inventory
+			WHERE Component_ID = ? AND StorageSite_ID = ? FOR UPDATE
+		`, compID, srcStorageID).Scan(&cur); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("no inventory on source: component %d storage %d", compID, srcStorageID)
+			}
+			return err
+		}
+		if cur < qty {
+			return fmt.Errorf("insufficient stock on source: component %d have %d need %d", compID, cur, qty)
+		}
+		if _, err := tx.Exec(`
+			UPDATE inventory SET Quantity = Quantity - ?
+			WHERE Component_ID = ? AND StorageSite_ID = ?
+		`, qty, compID, srcStorageID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`
+			DELETE FROM inventory WHERE Component_ID = ? AND StorageSite_ID = ? AND Quantity = 0
+		`, compID, srcStorageID); err != nil {
+			return err
+		}
+
+		// 2) увеличиваем на приёмнике (upsert)
+		if _, err := tx.Exec(`
+			INSERT INTO inventory (Component_ID, StorageSite_ID, Quantity)
+			VALUES (?, ?, ?)
+			ON DUPLICATE KEY UPDATE Quantity = Quantity + VALUES(Quantity)
+		`, compID, dstStorageID, qty); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// пересчитывает статус заказа по статусам партий
+func recomputeOrderStatusTx(tx *sql.Tx, orderID int) error {
+	var createdCnt, runningCnt, doneCnt int
+	if err := tx.QueryRow(`
+		SELECT
+			SUM(CASE WHEN Status='created' THEN 1 ELSE 0 END),
+			SUM(CASE WHEN Status='running' THEN 1 ELSE 0 END),
+			SUM(CASE WHEN Status='done'    THEN 1 ELSE 0 END)
+		FROM movementorderbatch
+		WHERE MovementOrder_ID = ?
+	`, orderID).Scan(&createdCnt, &runningCnt, &doneCnt); err != nil {
+		return err
+	}
+
+	newStatus := "created"
+	if runningCnt > 0 {
+		newStatus = "running"
+	}
+	// все партии завершены и ни одной running
+	var total int
+	if err := tx.QueryRow(`
+		SELECT COUNT(*) FROM movementorderbatch WHERE MovementOrder_ID = ?
+	`, orderID).Scan(&total); err != nil {
+		return err
+	}
+	if total > 0 && doneCnt == total {
+		newStatus = "done"
+	}
+
+	_, err := tx.Exec(`UPDATE movementorder SET Status = ? WHERE Order_ID = ?`, newStatus, orderID)
+	return err
 }
 
 // ----------------- SELECTs -----------------
@@ -444,18 +616,100 @@ func (m *MovementOrderModel) UpdateStatus(id int, newStatus string) error {
 	return tx.Commit()
 }
 
-// UpdateBatchStatus — меняет статус одной партии по Batch_ID.
-// allowed: created, running, done
+// --- публичный метод: смена статуса партии с движением инвентаря ---
 func (m *MovementOrderModel) UpdateBatchStatus(batchID int, newStatus string) error {
 	if batchID <= 0 {
-		return errors.New("invalid batchID")
+		return fmt.Errorf("invalid batch id")
 	}
-	if !validateBatchStatus(newStatus) {
-		return errors.New("invalid status")
+	if newStatus != "created" && newStatus != "running" && newStatus != "done" {
+		return fmt.Errorf("invalid status: %s", newStatus)
 	}
 
-	_, err := m.DB.Exec(`UPDATE movementorderbatch SET Status=? WHERE Batch_ID=?`, newStatus, batchID)
-	return err
+	tx, err := m.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// 1) Берём текущую партию под блокировку
+	var orderID int
+	var curStatus string
+	if err := tx.QueryRow(`
+		SELECT MovementOrder_ID, Status
+		FROM movementorderbatch
+		WHERE Batch_ID = ? FOR UPDATE
+	`, batchID).Scan(&orderID, &curStatus); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return models.ErrNoRecord
+		}
+		return err
+	}
+
+	// 2) Валидируем переход
+	switch curStatus {
+	case "created":
+		if newStatus != "running" {
+			return fmt.Errorf("illegal transition: %s -> %s", curStatus, newStatus)
+		}
+	case "running":
+		if newStatus != "done" {
+			return fmt.Errorf("illegal transition: %s -> %s", curStatus, newStatus)
+		}
+	case "done":
+		if newStatus != "done" {
+			return fmt.Errorf("illegal transition from done")
+		}
+	default:
+		return fmt.Errorf("unknown current status: %s", curStatus)
+	}
+
+	// 3) Достаём маршрут заказа (From/To/Transit)
+	fromID, toID, transitID, err := getRouteSiteIDsByOrderIDTx(tx, orderID)
+	if err != nil {
+		return err
+	}
+
+	// 4) Агрегируем позиции партии: component_id -> qty
+	compQty, err := sumBatchItemsTx(tx, batchID)
+	if err != nil {
+		return err
+	}
+	if len(compQty) == 0 {
+		return fmt.Errorf("batch %d has no items", batchID)
+	}
+
+	// 5) Движение инвентаря по переходу
+	switch {
+	case curStatus == "created" && newStatus == "running":
+		// Проверим вместимость транзитного склада по весу
+		if err := checkTransitCapacityByWeightTx(tx, transitID, compQty); err != nil {
+			return err
+		}
+		// From -> Transit
+		if err := moveStockTx(tx, fromID, transitID, compQty); err != nil {
+			return err
+		}
+
+	case curStatus == "running" && newStatus == "done":
+		// Transit -> To
+		if err := moveStockTx(tx, transitID, toID, compQty); err != nil {
+			return err
+		}
+	}
+
+	// 6) Фактическая смена статуса партии
+	if _, err := tx.Exec(`
+		UPDATE movementorderbatch SET Status = ? WHERE Batch_ID = ?
+	`, newStatus, batchID); err != nil {
+		return err
+	}
+
+	// 7) Пересчитать статус заказа по партиям
+	if err := recomputeOrderStatusTx(tx, orderID); err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 // Delete удаляет заказ перемещения по ID.

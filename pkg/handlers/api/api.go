@@ -180,11 +180,14 @@ func (h *APIHandler) MovementOrder(w http.ResponseWriter, r *http.Request) {
 		h.MovementOrderHandler.Post(w, r)
 	case http.MethodPut:
 		h.MovementOrderHandler.Put(w, r)
+	case http.MethodDelete:
+		h.MovementOrderHandler.Delete(w, r)
 	default:
 		w.Header().Set("Allow", strings.Join([]string{
 			http.MethodGet,
 			http.MethodPost,
 			http.MethodPut,
+			http.MethodDelete,
 		}, ", "))
 	}
 }

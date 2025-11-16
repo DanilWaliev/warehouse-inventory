@@ -54,8 +54,6 @@ func (s *MovementOrderService) ReadAll() ([]*models.MovementOrder, error) {
 		}
 
 		order.Route = *routePtr
-
-		orders = append(orders, order)
 	}
 
 	return orders, nil
