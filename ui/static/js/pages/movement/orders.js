@@ -236,7 +236,6 @@ export function initOrders({ showToast, showConfirm }) {
         <td>${fmtDate(o.CreatedAt)}</td>
         <td>${fmtDate(o.ClosedAt ?? o.ActualArrivalDate)}</td>
         <td>
-          <a class="btn" href="/move/${id}">Открыть</a>
           <button class="btn btn-secondary btn-toggle" data-id="${id}">Партии</button>
           <button class="btn btn-danger btn-delete" data-id="${id}">Удалить</button>
         </td>
