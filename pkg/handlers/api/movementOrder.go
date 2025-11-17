@@ -141,7 +141,10 @@ func (h *MovementOrderHandler) Put(w http.ResponseWriter, r *http.Request) {
 
 	status := r.URL.Query().Get("status")
 
-	err = h.MovementOrderService.UpdateBatchStatus(batchId, orderId, status)
+	// Получаем данные об отправителе
+	senderUser := r.Context().Value(auth.UserContextKey).(*auth.AuthorizedUser)
+
+	err = h.MovementOrderService.UpdateBatchStatus(batchId, orderId, status, senderUser.ID)
 	if err != nil {
 		h.Helper.ServerError(w, err)
 		return

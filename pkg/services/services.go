@@ -22,6 +22,6 @@ func NewServices(models *mysql.MySQLModels) *Services {
 		StorageService:         NewStorageService(models.StorageModel),
 		DocumentService:        NewDocumentService(models.DocumentModel),
 		RouteService:           NewRouteService(models.RouteModel, models.StorageModel),
-		MovementOrderService:   NewMovementOrderService(models.MovementOrderModel, models.RouteModel, models.ComponentModel, models.StorageModel),
+		MovementOrderService:   NewMovementOrderService(models.MovementOrderModel, models.RouteModel, models.ComponentModel, models.StorageModel, models.DocumentModel),
 	}
 }

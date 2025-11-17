@@ -10,14 +10,16 @@ type MovementOrderService struct {
 	routeModel         *mysql.RouteModel
 	componentModel     *mysql.ComponentModel
 	storageModel       *mysql.StorageModel
+	documentModel      *mysql.DocumentModel
 }
 
-func NewMovementOrderService(movementOrderModel *mysql.MovementOrderModel, routeModel *mysql.RouteModel, componentModel *mysql.ComponentModel, storageModel *mysql.StorageModel) *MovementOrderService {
+func NewMovementOrderService(movementOrderModel *mysql.MovementOrderModel, routeModel *mysql.RouteModel, componentModel *mysql.ComponentModel, storageModel *mysql.StorageModel, documentModel *mysql.DocumentModel) *MovementOrderService {
 	return &MovementOrderService{
 		movementOrderModel: movementOrderModel,
 		routeModel:         routeModel,
 		componentModel:     componentModel,
 		storageModel:       storageModel,
+		documentModel:      documentModel,
 	}
 }
 
@@ -84,11 +86,21 @@ func (s *MovementOrderService) Create(order *models.MovementOrder) error {
 	return s.movementOrderModel.Insert(order)
 }
 
-func (s *MovementOrderService) UpdateBatchStatus(batchId int, orderId int, newStatus string) error {
+func (s *MovementOrderService) UpdateBatchStatus(batchId int, orderId int, newStatus string, createdBy int) error {
 	switch newStatus {
 	case "running":
+		// создаем документ отправки
+		mo, err := s.movementOrderModel.SelectByID(orderId)
+		if err != nil {
+			return err
+		}
+		doc := &models.Document{
+			Type:            "send",
+			MovementOrderID: &mo.ID,
+			CreatedBy:       createdBy,
+		}
 		// обновляем статус партии
-		err := s.movementOrderModel.UpdateBatchStatus(batchId, "running")
+		_, err = s.documentModel.InsertMovementSend(doc, batchId)
 		if err != nil {
 			return err
 		}
@@ -109,8 +121,19 @@ func (s *MovementOrderService) UpdateBatchStatus(batchId int, orderId int, newSt
 			return err
 		}
 	case "done":
+		// создаем документ получки
+		mo, err := s.movementOrderModel.SelectByID(orderId)
+		if err != nil {
+			return err
+		}
+		doc := &models.Document{
+			Type:            "receive",
+			MovementOrderID: &mo.ID,
+			CreatedBy:       createdBy,
+		}
+
 		// обновляем статус партии
-		err := s.movementOrderModel.UpdateBatchStatus(batchId, "done")
+		_, err = s.documentModel.InsertMovementReceive(doc, batchId)
 		if err != nil {
 			return err
 		}

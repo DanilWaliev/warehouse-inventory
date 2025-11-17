@@ -138,3 +138,60 @@
 #modal-move-create .flex.justify-end {
   gap: 8px;
 }
+
+/* --- Pills / Badges / Compact buttons --- */
+.kv-row { 
+  display:flex; flex-wrap:wrap; gap:12px 16px; align-items:center;
+}
+.kv { display:flex; align-items:center; gap:8px; }
+.kv .label { color: var(--text-muted, #64748b); font-size: 14px; white-space: nowrap; }
+
+.chip {
+  display:inline-flex; align-items:center; justify-content:center;
+  height:32px; padding:0 12px; border-radius:10px;
+  border:1px solid var(--border-color, #e5e7eb);
+  background:#f8fafc; color:#0f172a; font-weight:600; font-size:14px;
+}
+
+.chip--neutral   { background:#f8fafc; color:#0f172a; }
+.chip--created   { border-color:#f59e0b; color:#b45309; background:rgba(245,158,11,.08); }
+.chip--running   { border-color:#3b82f6; color:#1d4ed8; background:rgba(59,130,246,.08); }
+.chip--done      { border-color:#10b981; color:#047857; background:rgba(16,185,129,.08); }
+
+.btn.btn-compact {
+  height:32px; padding:0 12px; border-radius:10px; line-height:30px; /* 32 - 2px border */
+  display:inline-flex; align-items:center; gap:8px;
+}
+.btn-group { display:flex; align-items:center; gap:8px; }
+
+/* Табличные бейджи статуса в просмотре заказа */
+.badge {
+  display:inline-flex; align-items:center; justify-content:center;
+  height:32px; padding:0 10px; border-radius:10px; font-weight:600; font-size:14px;
+  border:1px solid var(--border-color, #e5e7eb); background:#f8fafc; color:#0f172a;
+}
+.badge--created { border-color:#f59e0b; color:#b45309; background:rgba(245,158,11,.08); }
+.badge--running { border-color:#3b82f6; color:#1d4ed8; background:rgba(59,130,246,.08); }
+.badge--done    { border-color:#10b981; color:#047857; background:rgba(16,185,129,.08); }
+
+/* Ряды в модалке — единые вертикальные отступы */
+.modal .mb-row { margin-bottom: 16px; }
+
+/* В таблицах внутри модалки — чуть плотнее */
+.modal .table th, 
+.modal .table td { vertical-align: middle; }
+
+/* На всякий — одинаковые отступы между кнопками в модалках */
+.modal .btn + .btn { margin-left: 8px; }
+
+/* Просмотр заказа — чтобы большие списки партий уверенно скроллились */
+#modal-move-view .modal-content {
+  max-height: 90vh;         /* ограничиваем окно по высоте */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#modal-move-view #move-view-body {
+  overflow: auto;           /* прокрутка именно содержимого */
+  padding-right: 4px;       /* чтобы при появлении скролла контент не прыгал */
+}

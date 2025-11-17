@@ -616,101 +616,101 @@ func (m *MovementOrderModel) UpdateStatus(id int, newStatus string) error {
 	return tx.Commit()
 }
 
-// --- публичный метод: смена статуса партии с движением инвентаря ---
-func (m *MovementOrderModel) UpdateBatchStatus(batchID int, newStatus string) error {
-	if batchID <= 0 {
-		return fmt.Errorf("invalid batch id")
-	}
-	if newStatus != "created" && newStatus != "running" && newStatus != "done" {
-		return fmt.Errorf("invalid status: %s", newStatus)
-	}
+// // --- публичный метод: смена статуса партии с движением инвентаря ---
+// func (m *MovementOrderModel) UpdateBatchStatus(batchID int, newStatus string) error {
+// 	if batchID <= 0 {
+// 		return fmt.Errorf("invalid batch id")
+// 	}
+// 	if newStatus != "created" && newStatus != "running" && newStatus != "done" {
+// 		return fmt.Errorf("invalid status: %s", newStatus)
+// 	}
 
-	tx, err := m.DB.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
+// 	tx, err := m.DB.Begin()
+// 	if err != nil {
+// 		return err
+// 	}
+// 	defer tx.Rollback()
 
-	// 1) Берём текущую партию под блокировку
-	var orderID int
-	var curStatus string
-	if err := tx.QueryRow(`
-		SELECT MovementOrder_ID, Status
-		FROM movementorderbatch
-		WHERE Batch_ID = ? FOR UPDATE
-	`, batchID).Scan(&orderID, &curStatus); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return models.ErrNoRecord
-		}
-		return err
-	}
+// 	// 1) Берём текущую партию под блокировку
+// 	var orderID int
+// 	var curStatus string
+// 	if err := tx.QueryRow(`
+// 		SELECT MovementOrder_ID, Status
+// 		FROM movementorderbatch
+// 		WHERE Batch_ID = ? FOR UPDATE
+// 	`, batchID).Scan(&orderID, &curStatus); err != nil {
+// 		if errors.Is(err, sql.ErrNoRows) {
+// 			return models.ErrNoRecord
+// 		}
+// 		return err
+// 	}
 
-	// 2) Валидируем переход
-	switch curStatus {
-	case "created":
-		if newStatus != "running" {
-			return fmt.Errorf("illegal transition: %s -> %s", curStatus, newStatus)
-		}
-	case "running":
-		if newStatus != "done" {
-			return fmt.Errorf("illegal transition: %s -> %s", curStatus, newStatus)
-		}
-	case "done":
-		if newStatus != "done" {
-			return fmt.Errorf("illegal transition from done")
-		}
-	default:
-		return fmt.Errorf("unknown current status: %s", curStatus)
-	}
+// 	// 2) Валидируем переход
+// 	switch curStatus {
+// 	case "created":
+// 		if newStatus != "running" {
+// 			return fmt.Errorf("illegal transition: %s -> %s", curStatus, newStatus)
+// 		}
+// 	case "running":
+// 		if newStatus != "done" {
+// 			return fmt.Errorf("illegal transition: %s -> %s", curStatus, newStatus)
+// 		}
+// 	case "done":
+// 		if newStatus != "done" {
+// 			return fmt.Errorf("illegal transition from done")
+// 		}
+// 	default:
+// 		return fmt.Errorf("unknown current status: %s", curStatus)
+// 	}
 
-	// 3) Достаём маршрут заказа (From/To/Transit)
-	fromID, toID, transitID, err := getRouteSiteIDsByOrderIDTx(tx, orderID)
-	if err != nil {
-		return err
-	}
+// 	// 3) Достаём маршрут заказа (From/To/Transit)
+// 	fromID, toID, transitID, err := getRouteSiteIDsByOrderIDTx(tx, orderID)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	// 4) Агрегируем позиции партии: component_id -> qty
-	compQty, err := sumBatchItemsTx(tx, batchID)
-	if err != nil {
-		return err
-	}
-	if len(compQty) == 0 {
-		return fmt.Errorf("batch %d has no items", batchID)
-	}
+// 	// 4) Агрегируем позиции партии: component_id -> qty
+// 	compQty, err := sumBatchItemsTx(tx, batchID)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	if len(compQty) == 0 {
+// 		return fmt.Errorf("batch %d has no items", batchID)
+// 	}
 
-	// 5) Движение инвентаря по переходу
-	switch {
-	case curStatus == "created" && newStatus == "running":
-		// Проверим вместимость транзитного склада по весу
-		if err := checkTransitCapacityByWeightTx(tx, transitID, compQty); err != nil {
-			return err
-		}
-		// From -> Transit
-		if err := moveStockTx(tx, fromID, transitID, compQty); err != nil {
-			return err
-		}
+// 	// 5) Движение инвентаря по переходу
+// 	switch {
+// 	case curStatus == "created" && newStatus == "running":
+// 		// Проверим вместимость транзитного склада по весу
+// 		if err := checkTransitCapacityByWeightTx(tx, transitID, compQty); err != nil {
+// 			return err
+// 		}
+// 		// From -> Transit
+// 		if err := moveStockTx(tx, fromID, transitID, compQty); err != nil {
+// 			return err
+// 		}
 
-	case curStatus == "running" && newStatus == "done":
-		// Transit -> To
-		if err := moveStockTx(tx, transitID, toID, compQty); err != nil {
-			return err
-		}
-	}
+// 	case curStatus == "running" && newStatus == "done":
+// 		// Transit -> To
+// 		if err := moveStockTx(tx, transitID, toID, compQty); err != nil {
+// 			return err
+// 		}
+// 	}
 
-	// 6) Фактическая смена статуса партии
-	if _, err := tx.Exec(`
-		UPDATE movementorderbatch SET Status = ? WHERE Batch_ID = ?
-	`, newStatus, batchID); err != nil {
-		return err
-	}
+// 	// 6) Фактическая смена статуса партии
+// 	if _, err := tx.Exec(`
+// 		UPDATE movementorderbatch SET Status = ? WHERE Batch_ID = ?
+// 	`, newStatus, batchID); err != nil {
+// 		return err
+// 	}
 
-	// 7) Пересчитать статус заказа по партиям
-	if err := recomputeOrderStatusTx(tx, orderID); err != nil {
-		return err
-	}
+// 	// 7) Пересчитать статус заказа по партиям
+// 	if err := recomputeOrderStatusTx(tx, orderID); err != nil {
+// 		return err
+// 	}
 
-	return tx.Commit()
-}
+// 	return tx.Commit()
+// }
 
 // Delete удаляет заказ перемещения по ID.
 // Благодаря ON DELETE CASCADE на movementorderbatch и movementorderbatchitem

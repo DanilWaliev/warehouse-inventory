@@ -359,6 +359,26 @@ func (m *DocumentModel) Insert(d *models.Document, extra ...any) (*models.Docume
 		return m.InsertProductionCreate(d)
 	case "productionFinish":
 		return m.InsertProductionFinish(d)
+	case "send":
+		// Ожидаем batchID в extra[0]
+		if len(extra) < 1 {
+			return nil, errors.New("batch id required for send document")
+		}
+		batchID, ok := extra[0].(int)
+		if !ok || batchID <= 0 {
+			return nil, errors.New("invalid batch id for send document")
+		}
+		return m.InsertMovementSend(d, batchID)
+	case "receive":
+		// Ожидаем batchID в extra[0]
+		if len(extra) < 1 {
+			return nil, errors.New("batch id required for receive document")
+		}
+		batchID, ok := extra[0].(int)
+		if !ok || batchID <= 0 {
+			return nil, errors.New("invalid batch id for receive document")
+		}
+		return m.InsertMovementReceive(d, batchID)
 	default:
 		return nil, fmt.Errorf("unsupported document type: %s", d.Type)
 	}
@@ -486,8 +506,6 @@ func (m *DocumentModel) InsertProductionCreate(d *models.Document) (*models.Docu
 	if len(d.Items) == 0 {
 		return nil, errors.New("plan (d.Items) is empty")
 	}
-
-	const productionStorageID = 1
 
 	// На базе текущего подключения делаем локальную модель рецептур.
 	rm := &RecipeModel{DB: m.DB}
@@ -737,6 +755,239 @@ func (m *DocumentModel) InsertProductionFinish(d *models.Document) (*models.Docu
 	d.ID = docID
 	d.Type = "productionFinish"
 	d.Items = docItems
+	return d, nil
+}
+
+// InsertMovementSend — создаёт документ отправки (send) по партии перемещения,
+// и ТОЛЬКО вместе с этим:
+//   - проверяет статус партии (должен быть 'created'),
+//   - двигает инвентарь From -> Transit,
+//   - создаёт документ/documentitem,
+//   - переводит партию в статус 'running',
+//   - пересчитывает статус заказа.
+//
+// Требуется:
+//   - d != nil
+//   - d.CreatedBy > 0
+//   - batchID > 0
+func (m *DocumentModel) InsertMovementSend(d *models.Document, batchID int) (*models.Document, error) {
+	if d == nil {
+		return nil, errors.New("nil document")
+	}
+	if d.CreatedBy <= 0 {
+		return nil, errors.New("CreatedBy is required for send document")
+	}
+	if batchID <= 0 {
+		return nil, errors.New("invalid batch id for send document")
+	}
+
+	tx, err := m.DB.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	// 1) Берём партию под блокировку и узнаём заказ и текущий статус.
+	var orderID int
+	var curStatus string
+	if err := tx.QueryRow(`
+		SELECT MovementOrder_ID, Status
+		FROM movementorderbatch
+		WHERE Batch_ID = ? FOR UPDATE
+	`, batchID).Scan(&orderID, &curStatus); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, models.ErrNoRecord
+		}
+		return nil, err
+	}
+
+	if curStatus != "created" {
+		return nil, fmt.Errorf("batch %d must be in status 'created' to send (got %s)", batchID, curStatus)
+	}
+
+	// 2) Маршрут заказа (From / To / Transit).
+	fromID, _, transitID, err := getRouteSiteIDsByOrderIDTx(tx, orderID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3) Агрегируем позиции партии.
+	compQty, err := sumBatchItemsTx(tx, batchID)
+	if err != nil {
+		return nil, err
+	}
+	if len(compQty) == 0 {
+		return nil, fmt.Errorf("batch %d has no items", batchID)
+	}
+
+	// 4) Проверка вместимости транзита по весу + движение From -> Transit.
+	if err := checkTransitCapacityByWeightTx(tx, transitID, compQty); err != nil {
+		return nil, err
+	}
+	if err := moveStockTx(tx, fromID, transitID, compQty); err != nil {
+		return nil, err
+	}
+
+	// 5) Создаём документ 'send' (StorageSite_ID = NULL, MovementOrder_Order_ID = orderID).
+	docID, err := m.insertDocumentHeaderTx(tx, "send", d.CreatedBy, d.Notes, &orderID, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// 6) Позиции документа — то, что реально поехало (агрегировано по компоненту).
+	docItems := make([]models.DocumentItem, 0, len(compQty))
+	for compID, qty := range compQty {
+		if qty <= 0 {
+			continue
+		}
+		docItems = append(docItems, models.DocumentItem{
+			Component: models.Component{ID: compID},
+			Quantity:  qty,
+		})
+	}
+	if err := m.insertDocumentItemsTx(tx, docID, docItems); err != nil {
+		return nil, err
+	}
+
+	// 7) Смена статуса партии -> 'running'.
+	if _, err := tx.Exec(`
+		UPDATE movementorderbatch
+		   SET Status = 'running'
+		 WHERE Batch_ID = ?
+	`, batchID); err != nil {
+		return nil, err
+	}
+
+	// 8) Пересчёт статуса заказа по партиям.
+	if err := recomputeOrderStatusTx(tx, orderID); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	// Заполняем возвращаемую структуру.
+	d.ID = docID
+	d.Type = "send"
+	d.MovementOrderID = &orderID
+	d.Items = docItems
+
+	return d, nil
+}
+
+// InsertMovementReceive — создаёт документ приёмки (receive) по партии перемещения,
+// и ТОЛЬКО вместе с этим:
+//   - проверяет статус партии (должен быть 'running'),
+//   - двигает инвентарь Transit -> To,
+//   - создаёт document/documentitem,
+//   - переводит партию в статус 'done',
+//   - пересчитывает статус заказа.
+//
+// Требуется:
+//   - d != nil
+//   - d.CreatedBy > 0
+//   - batchID > 0
+func (m *DocumentModel) InsertMovementReceive(d *models.Document, batchID int) (*models.Document, error) {
+	if d == nil {
+		return nil, errors.New("nil document")
+	}
+	if d.CreatedBy <= 0 {
+		return nil, errors.New("CreatedBy is required for receive document")
+	}
+	if batchID <= 0 {
+		return nil, errors.New("invalid batch id for receive document")
+	}
+
+	tx, err := m.DB.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	// 1) Берём партию под блокировку и узнаём заказ и текущий статус.
+	var orderID int
+	var curStatus string
+	if err := tx.QueryRow(`
+		SELECT MovementOrder_ID, Status
+		FROM movementorderbatch
+		WHERE Batch_ID = ? FOR UPDATE
+	`, batchID).Scan(&orderID, &curStatus); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, models.ErrNoRecord
+		}
+		return nil, err
+	}
+
+	if curStatus != "running" {
+		return nil, fmt.Errorf("batch %d must be in status 'running' to receive (got %s)", batchID, curStatus)
+	}
+
+	// 2) Маршрут заказа (From / To / Transit).
+	_, toID, transitID, err := getRouteSiteIDsByOrderIDTx(tx, orderID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3) Агрегируем позиции партии.
+	compQty, err := sumBatchItemsTx(tx, batchID)
+	if err != nil {
+		return nil, err
+	}
+	if len(compQty) == 0 {
+		return nil, fmt.Errorf("batch %d has no items", batchID)
+	}
+
+	// 4) Движение инвентаря Transit -> To.
+	if err := moveStockTx(tx, transitID, toID, compQty); err != nil {
+		return nil, err
+	}
+
+	// 5) Создаём документ 'receive' (StorageSite_ID = NULL, MovementOrder_Order_ID = orderID).
+	docID, err := m.insertDocumentHeaderTx(tx, "receive", d.CreatedBy, d.Notes, &orderID, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// 6) Позиции документа — фактически принятый товар.
+	docItems := make([]models.DocumentItem, 0, len(compQty))
+	for compID, qty := range compQty {
+		if qty <= 0 {
+			continue
+		}
+		docItems = append(docItems, models.DocumentItem{
+			Component: models.Component{ID: compID},
+			Quantity:  qty,
+		})
+	}
+	if err := m.insertDocumentItemsTx(tx, docID, docItems); err != nil {
+		return nil, err
+	}
+
+	// 7) Смена статуса партии -> 'done'.
+	if _, err := tx.Exec(`
+		UPDATE movementorderbatch
+		   SET Status = 'done'
+		 WHERE Batch_ID = ?
+	`, batchID); err != nil {
+		return nil, err
+	}
+
+	// 8) Пересчёт статуса заказа по партиям.
+	if err := recomputeOrderStatusTx(tx, orderID); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	// Заполняем возвращаемую структуру.
+	d.ID = docID
+	d.Type = "receive"
+	d.MovementOrderID = &orderID
+	d.Items = docItems
+
 	return d, nil
 }
 

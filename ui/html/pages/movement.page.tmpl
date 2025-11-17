@@ -125,17 +125,32 @@
         </div>
       </div>
 
-      <!-- Информация о маршруте (заполняется автоматически) -->
-      <div id="move-route-info" class="mb-4"
-           style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;">
-        <div><strong>Маршрут:</strong> <span id="move-route-name" class="text-muted">—</span></div>
-          <div style="display:flex;align-items:center;gap:.5rem;">
-            <label for="move-transit" class="text-muted">Транзит:</label>
-            <select id="move-transit" style="min-width:18ch"></select>
-          </div>
-        <div><strong>Оценка времени:</strong> <span id="move-route-eta" class="text-muted">—</span></div>
-        <div><strong>Вместимость:</strong> <span id="move-route-capacity" class="text-muted">—</span></div>
+  <!-- Информация о маршруте (заполняется автоматически) -->
+  <div id="move-route-info" class="mb-row">
+    <div class="kv-row">
+      <div class="kv">
+        <span class="label">Маршрут</span>
+        <span id="move-route-name" class="chip chip--neutral">—</span>
       </div>
+
+      <div class="kv">
+        <span class="label">Транзит</span>
+        <!-- селект транзита тот же, просто с pill-высотой -->
+        <select id="move-transit" class="btn-compact" style="min-width:18ch;"></select>
+      </div>
+
+      <div class="kv">
+        <span class="label">Оценка времени</span>
+        <span id="move-route-eta" class="chip chip--neutral">—</span>
+      </div>
+
+      <div class="kv">
+        <span class="label">Вместимость</span>
+        <span id="move-route-capacity" class="chip chip--neutral">—</span>
+      </div>
+    </div>
+</div>
+
 
       <!-- Позиции заказа (компонент + количество) -->
       <div class="card p-4">
