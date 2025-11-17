@@ -9,13 +9,15 @@ type MovementOrderService struct {
 	movementOrderModel *mysql.MovementOrderModel
 	routeModel         *mysql.RouteModel
 	componentModel     *mysql.ComponentModel
+	storageModel       *mysql.StorageModel
 }
 
-func NewMovementOrderService(movementOrderModel *mysql.MovementOrderModel, routeModel *mysql.RouteModel, componentModel *mysql.ComponentModel) *MovementOrderService {
+func NewMovementOrderService(movementOrderModel *mysql.MovementOrderModel, routeModel *mysql.RouteModel, componentModel *mysql.ComponentModel, storageModel *mysql.StorageModel) *MovementOrderService {
 	return &MovementOrderService{
 		movementOrderModel: movementOrderModel,
 		routeModel:         routeModel,
 		componentModel:     componentModel,
+		storageModel:       storageModel,
 	}
 }
 
@@ -32,7 +34,10 @@ func (s *MovementOrderService) ReadByIDs(ids []int) ([]*models.MovementOrder, er
 		if err != nil {
 			return nil, err
 		}
-
+		routePtr, err = selectStoragesForRoute(routePtr, s.storageModel)
+		if err != nil {
+			return nil, err
+		}
 		order.Route = *routePtr
 
 		orders = append(orders, order)
@@ -132,4 +137,26 @@ func (s *MovementOrderService) UpdateBatchStatus(batchId int, orderId int, newSt
 
 func (s *MovementOrderService) Delete(id int) error {
 	return s.movementOrderModel.Delete(id)
+}
+
+func selectStoragesForRoute(route *models.Route, s *mysql.StorageModel) (*models.Route, error) {
+	storagePtr, err := s.SelectWithoutInventoryByID(route.From.ID)
+	if err != nil {
+		return nil, err
+	}
+	route.From = *storagePtr
+
+	storagePtr, err = s.SelectWithoutInventoryByID(route.To.ID)
+	if err != nil {
+		return nil, err
+	}
+	route.To = *storagePtr
+
+	storagePtr, err = s.SelectWithoutInventoryByID(route.Transit.ID)
+	if err != nil {
+		return nil, err
+	}
+	route.Transit = *storagePtr
+
+	return route, nil
 }

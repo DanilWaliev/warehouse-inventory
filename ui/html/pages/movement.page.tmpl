@@ -125,18 +125,14 @@
         </div>
       </div>
 
-      <div class="mb-3" style="max-width:520px; display:flex; flex-direction:column; gap:6px;">
-        <label class="text-muted">Маршрут / транзит</label>
-        <select id="move-route-select" disabled>
-          <option value="">— маршрут не найден —</option>
-        </select>
-      </div>
-
       <!-- Информация о маршруте (заполняется автоматически) -->
       <div id="move-route-info" class="mb-4"
            style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;">
         <div><strong>Маршрут:</strong> <span id="move-route-name" class="text-muted">—</span></div>
-        <div><strong>Транзит:</strong> <span id="move-route-transit" class="text-muted">—</span></div>
+          <div style="display:flex;align-items:center;gap:.5rem;">
+            <label for="move-transit" class="text-muted">Транзит:</label>
+            <select id="move-transit" style="min-width:18ch"></select>
+          </div>
         <div><strong>Оценка времени:</strong> <span id="move-route-eta" class="text-muted">—</span></div>
         <div><strong>Вместимость:</strong> <span id="move-route-capacity" class="text-muted">—</span></div>
       </div>
@@ -274,6 +270,33 @@
       </div>
     </div>
   </div>
+
+
+  <!-- Разбить заказ на партии -->
+  <div id="modal-split" class="modal hidden" aria-hidden="true">
+    <div class="modal-content" style="max-width: 520px;">
+      <h3 class="mb-3">Разбить заказ на партии</h3>
+  
+      <div id="split-info" class="mb-3 text-muted">
+        <!-- сюда подставится суммарный вес и вместимость -->
+      </div>
+  
+      <div class="mb-3" style="display:flex;gap:.75rem;align-items:center;">
+        <label for="split-count" style="min-width:14ch;">Кол-во партий</label>
+        <input id="split-count" type="number" min="1" step="1" value="1" style="width:10ch;">
+      </div>
+  
+      <div id="split-error" class="mb-3" style="display:none;color:#dc2626;font-weight:600;">
+        <!-- сюда пишем подсказку если не помещается -->
+      </div>
+  
+      <div class="flex justify-end" style="gap:8px;">
+        <button type="button" class="btn" id="split-cancel">Отмена</button>
+        <button type="button" class="btn btn-primary" id="split-ok">Разбить</button>
+      </div>
+    </div>
+  </div>
+
 
 
 </section>

@@ -64,9 +64,6 @@ func (h *MovementOrderHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 func (h *MovementOrderHandler) Post(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		FromId    int    `json:"fromId"`
-		ToId      int    `json:"toId"`
-		TransitId int    `json:"transitId"`
 		RouteId   int    `json:"routeId"`
 		CreatedBy int    `json:"createdBy"`
 		Notes     string `json:"notes"`
@@ -85,7 +82,7 @@ func (h *MovementOrderHandler) Post(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Проверка минимальных условий
-	if input.FromId == 0 || input.ToId == 0 || input.TransitId == 0 || len(input.Batches) == 0 || len(input.Batches[0].Items) == 0 {
+	if input.RouteId == 0 || len(input.Batches[0].Items) == 0 {
 		h.Helper.ClientError(w, http.StatusBadRequest)
 		return
 	}
