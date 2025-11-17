@@ -51,7 +51,7 @@ export function initRoutes({ showToast, showConfirm }) {
   }
 
   async function fetchStorages() {
-    const res = await fetch('/api/storage?type=warehouse&inventory=false');
+    const res = await fetch('/api/storage?type=warehouse&type=productionsite&inventory=false');
     return parseListGET(res, "Ошибка загрузки складов");
   }
 
