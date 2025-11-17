@@ -127,7 +127,27 @@ func (h *MovementOrderHandler) Post(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *MovementOrderHandler) Put(w http.ResponseWriter, r *http.Request) {
+	batchId, err := strconv.Atoi(r.URL.Query().Get("batchId"))
+	if err != nil {
+		h.Helper.ClientError(w, http.StatusBadRequest)
+		return
+	}
 
+	orderId, err := strconv.Atoi(r.URL.Query().Get("orderId"))
+	if err != nil {
+		h.Helper.ClientError(w, http.StatusBadRequest)
+		return
+	}
+
+	status := r.URL.Query().Get("status")
+
+	err = h.MovementOrderService.UpdateBatchStatus(batchId, orderId, status)
+	if err != nil {
+		h.Helper.ServerError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 func (h *MovementOrderHandler) Delete(w http.ResponseWriter, r *http.Request) {

@@ -4,146 +4,129 @@ export function initOrders({ showToast, showConfirm }) {
   const table = document.getElementById('table-move');
   const tbody = table ? document.getElementById('table-move-body') : null;
 
-  // Создание заказа
-  const modalCreate = document.getElementById('modal-move-create');
+  // Модалка создания заказа
+  const modal       = document.getElementById('modal-move-create');
   const selFrom     = document.getElementById('move-from');
   const selTo       = document.getElementById('move-to');
   const selTransit  = document.getElementById('move-transit');
-
-  const routeInfo = {
-    id:       document.getElementById('move-route-id'),
-    name:     document.getElementById('move-route-name'),
-    eta:      document.getElementById('move-route-eta'),
+  const routeInfo   = {
+    id:   document.getElementById('move-route-id'),
+    name: document.getElementById('move-route-name'),
+    eta:  document.getElementById('move-route-eta'),
     capacity: document.getElementById('move-route-capacity'),
   };
-
   const items = {
     body:   document.getElementById('move-items-body'),
     empty:  document.getElementById('move-items-empty'),
     addBtn: document.getElementById('move-add-item'),
   };
+  const notesEl     = document.getElementById('move-notes');
+  const submitBtn   = document.getElementById('move-submit');
 
-  const notesEl   = document.getElementById('move-notes');
-  const submitBtn = document.getElementById('move-submit');
+  // Модалка просмотра заказа
+  const modalView     = document.getElementById('modal-move-view');
+  const modalViewBody = document.getElementById('move-view-body');
+  const modalViewClose= document.getElementById('move-view-close');
 
-  // Просмотр заказа
-  const modalView      = document.getElementById('modal-move-view');
-  const modalViewBody  = document.getElementById('move-view-body');
-  const modalViewClose = document.getElementById('move-view-close');
-
-  // “Итого вес”
+  // Элемент для показа суммарного веса
   let totalWeightEl = null;
 
-  // ===== Кэш =====
-  const cache = {
+  // Кэш
+  let cache = {
     warehouses: [],
     routes:     [],
-    components: [],
-    componentsIndex: new Map(), // id -> component (для веса)
+    components: []
   };
 
-  // ===== Сетевые хелперы =====
-  function once(fn){ let called=false; return (...a)=>{ if(called) return; called=true; fn(...a); }; }
-  const toastOnce = {
-    ord: once((m)=>showToast?.(m||'Ошибка загрузки заказов')),
-    wh:  once((m)=>showToast?.(m||'Ошибка загрузки складов')),
-    rts: once((m)=>showToast?.(m||'Ошибка загрузки маршрутов')),
-    tmc: once((m)=>showToast?.(m||'Ошибка загрузки ТМЦ')),
-  };
-
-  async function getJSON(url, { toastKey, fallbackMsg, timeoutMs = 8000 } = {}) {
-    const ac = new AbortController();
-    const t  = setTimeout(()=>ac.abort('timeout'), timeoutMs);
-    try {
-      const res = await fetch(url, { signal: ac.signal });
-      if (res.status === 404) return [];
-      if (!res.ok) { toastKey && toastOnce[toastKey]?.(fallbackMsg); return []; }
-      const ct = res.headers.get('Content-Type') || '';
-      return ct.includes('application/json') ? await res.json() : [];
-    } catch {
-      toastKey && toastOnce[toastKey]?.(fallbackMsg);
-      return [];
-    } finally { clearTimeout(t); }
+  // ===== helpers: тосты/парсеры =====
+  function toastByStatus(res, fallback) {
+    switch (res.status) {
+      case 409: showToast?.("Конфликт данных"); break;
+      case 400: showToast?.("Некорректные данные"); break;
+      default:  showToast?.(fallback || "Ошибка запроса");
+    }
   }
-
-  async function sendJSON(url, options = {}, fallbackMsg) {
-    const ac = new AbortController();
-    const t  = setTimeout(()=>ac.abort('timeout'), 8000);
-    try {
-      const res = await fetch(url, { signal: ac.signal, ...options });
-      if (!res.ok) {
-        switch (res.status) {
-          case 409: showToast?.('Конфликт данных'); break;
-          case 400: showToast?.('Некорректные данные'); break;
-          default:  showToast?.(fallbackMsg || 'Ошибка запроса');
-        }
-        return null;
-      }
-      const ct = res.headers.get('Content-Type') || '';
-      return ct.includes('application/json') ? await res.json() : true;
-    } catch {
-      showToast?.(fallbackMsg || 'Сетевой сбой');
-      return null;
-    } finally { clearTimeout(t); }
+  async function parseListGET(res, fallback) {
+    if (res.status === 404) return [];
+    if (!res.ok) { toastByStatus(res, fallback); return []; }
+    const ct = res.headers.get('Content-Type') || '';
+    return ct.includes('application/json') ? await res.json() : [];
+  }
+  async function parseOrToast(res, fallback) {
+    if (!res.ok) { toastByStatus(res, fallback); return null; }
+    const ct = res.headers.get('Content-Type') || '';
+    return ct.includes('application/json') ? await res.json() : true;
   }
 
   // ===== API =====
-  const fetchOrders     = () => getJSON('/api/move', { toastKey:'ord', fallbackMsg:'Ошибка загрузки заказов' });
-  const fetchWarehouses = () => getJSON('/api/storage?type=warehouse&inventory=false', { toastKey:'wh',  fallbackMsg:'Ошибка загрузки складов' });
-  const fetchRoutes     = () => getJSON('/api/route', { toastKey:'rts', fallbackMsg:'Ошибка загрузки маршрутов' });
-  const fetchComponents = () => getJSON('/api/tmc', { toastKey:'tmc', fallbackMsg:'Ошибка загрузки ТМЦ' });
-
-  const deleteOrder = (id) =>
-    sendJSON(`/api/move?id=${encodeURIComponent(id)}`, { method:'DELETE' }, 'Ошибка при удалении заказа');
-
-  const setOrderStatus = (id, status) =>
-    sendJSON(`/api/move?id=${encodeURIComponent(id)}&status=${encodeURIComponent(status)}`, { method:'PUT' }, 'Ошибка смены статуса');
-
-  const createOrderWithBatches = (payload) =>
-    sendJSON('/api/move', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) }, 'Ошибка при создании заказа');
-
-  // ===== Утилиты =====
-  const fmtDateSafe = (d)=>{
-    if (!d) return '-';
-    if (typeof d === 'string' && /^0+1-0*1-0*1/.test(d)) return '-';
-    const dt = new Date(d); return Number.isNaN(dt.getTime()) ? '-' : dt.toLocaleString('ru-RU');
-  };
-  const statusText = (s)=>{
-    switch (s) { case 'created': return 'Создан'; case 'running': return 'Отправлен'; case 'done': return 'Завершён'; default: return s||'—'; }
-  };
-
-  const weightOf = (componentId)=>{
-    const c = cache.componentsIndex.get(componentId);
-    return c ? Number(c.Weight)||0 : 0;
-  };
-  const calcItemWeight = (componentId, qty)=> weightOf(componentId)*(Number(qty)||0);
-
-  function collectItems() {
-    const out = [];
-    for (const r of items.body.querySelectorAll('tr')) {
-      const sel  = r.querySelector('.move-item-component');
-      const qtyE = r.querySelector('.move-item-qty');
-      const cid  = parseInt(sel?.value || '0', 10);
-      const qty  = parseInt(qtyE?.value || '0', 10);
-      if (cid > 0 && Number.isFinite(qty) && qty > 0) out.push({ componentId: cid, quantity: qty });
-    }
-    return out;
+  async function fetchOrders() {
+    const res = await fetch('/api/move');
+    return parseListGET(res, "Ошибка загрузки заказов");
   }
-  const calcTotalWeight = (list)=> list.reduce((s,it)=> s + calcItemWeight(it.componentId,it.quantity), 0);
+  async function fetchOrderById(orderId) {
+    const res = await fetch(`/api/move?id=${orderId}`);
+    const data = await parseOrToast(res, "Ошибка загрузки заказа");
+    if (!data) return null;
+    return Array.isArray(data) ? data[0] : data;
+  }
+  async function deleteOrder(id) {
+    const res = await fetch(`/api/move?id=${id}`, { method: 'DELETE' });
+    return parseOrToast(res, "Ошибка при удалении заказа");
+  }
 
-  // ===== Таблица заказов =====
-  const firstActionForOrder = (o)=>{
-    if (o.Batches?.some(b=>b.Status==='created')) return 'send';
-    if (o.Batches?.some(b=>b.Status==='running')) return 'receive';
-    return null;
-  };
-  const actionButtonHTML = (kind, id)=>{
-    if (kind==='send')   return `<button class="btn btn-primary btn-send" data-id="${id}">Отправить</button>`;
-    if (kind==='receive')return `<button class="btn btn-primary btn-recv" data-id="${id}">Принять</button>`;
-    return '';
-  };
-  const onSendOrder    = async (id)=>{ const ok = await setOrderStatus(id,'running'); if (ok){ await load(); showToast?.('Партия отправлена','success'); } };
-  const onReceiveOrder = async (id)=>{ const ok = await setOrderStatus(id,'done');    if (ok){ await load(); showToast?.('Партия принята','success'); } };
+  async function fetchWarehouses() {
+    const res = await fetch('/api/storage?type=warehouse&inventory=false');
+    return parseListGET(res, "Ошибка загрузки складов");
+  }
+  async function fetchRoutes() {
+    const res = await fetch('/api/route');
+    return parseListGET(res, "Ошибка загрузки маршрутов");
+  }
+  async function fetchComponents() {
+    const res = await fetch('/api/tmc');
+    return parseListGET(res, "Ошибка загрузки ТМЦ");
+  }
+
+  async function createOrderWithBatches(payload) {
+    const res = await fetch('/api/move', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return parseOrToast(res, "Ошибка при создании заказа");
+  }
+
+  async function updateBatchStatus(orderId, batchId, newStatus) {
+    const url = `/api/move?orderId=${encodeURIComponent(orderId)}&batchId=${encodeURIComponent(batchId)}&status=${encodeURIComponent(newStatus)}`;
+    const res = await fetch(url, { method: 'PUT' });
+    return parseOrToast(res, "Не удалось обновить статус партии");
+  }
+
+  // ===== форматирование =====
+  function fmtDate(d) {
+    if (!d) return '-';
+    try {
+      const dt = new Date(d);
+      if (Number.isNaN(dt.getTime())) return String(d);
+      if (dt.getFullYear() <= 1971) return '-';
+      return dt.toLocaleString('ru-RU');
+    } catch { return String(d); }
+  }
+  function getStatus(o) {
+    switch (o.Status) {
+      case 'created': return 'Создан';
+      case 'running': return 'Отправлен';
+      case 'done':    return 'Завершён';
+      default:        return o.Status || '—';
+    }
+  }
+  function getBatchesCount(o) {
+    if (typeof o.BatchesCount === 'number') return o.BatchesCount;
+    if (Array.isArray(o.Batches)) return o.Batches.length;
+    return 0;
+  }
+  function getRouteID(o)   { return o.Route?.ID ?? o.RouteID ?? o.RouteId ?? '—'; }
+  function getTransitID(o) { return o.Route?.Transit?.ID ?? o.TransitID ?? o.TransitId ?? '—'; }
 
   function renderEmpty() {
     if (!tbody) return;
@@ -157,12 +140,12 @@ export function initOrders({ showToast, showConfirm }) {
 
     for (const o of list) {
       const id           = o.ID ?? o.Id ?? '—';
-      const routeID      = o.Route?.ID ?? o.RouteID ?? '—';
-      const transitID    = o.Route?.Transit?.ID ?? o.TransitID ?? '—';
-      const batchesCount = Array.isArray(o.Batches) ? o.Batches.length : (o.BatchesCount ?? 0);
-      const status       = statusText(o.Status);
-      const createdAt    = fmtDateSafe(o.CreatedAt);
-      const closedAt     = fmtDateSafe(o.Aad ?? o.ClosedAt);
+      const routeID      = getRouteID(o);
+      const transitID    = getTransitID(o);
+      const batchesCount = getBatchesCount(o);
+      const statusText   = getStatus(o);
+      const createdAt    = fmtDate(o.CreatedAt);
+      const closedAt     = fmtDate(o.ClosedAt ?? o.Aad);
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
@@ -170,130 +153,151 @@ export function initOrders({ showToast, showConfirm }) {
         <td style="width:12ch;">${routeID}</td>
         <td style="width:12ch;">${transitID}</td>
         <td style="width:12ch;">${batchesCount}</td>
-        <td style="width:22ch;">${status}</td>
+        <td style="width:22ch;">${statusText}</td>
         <td>${createdAt}</td>
         <td>${closedAt}</td>
-        <td class="nowrap">
-          <button class="btn btn-secondary btn-view" data-id="${id}">Открыть</button>
-          ${actionButtonHTML(firstActionForOrder(o), id)}
-          <button class="btn btn-danger btn-del" data-id="${id}">Удалить</button>
+        <td>
+          <a class="btn btn-small" data-action="view" data-id="${id}">Открыть</a>
+          <button class="btn btn-danger btn-small" data-action="delete" data-id="${id}">Удалить</button>
         </td>
       `;
 
-      tr.querySelector('.btn-view') ?.addEventListener('click', () => openView(o));
-      tr.querySelector('.btn-del')  ?.addEventListener('click', async () => {
-        if (!(await showConfirm?.('Удалить заказ перемещения?', 'Подтверждение'))) return;
-        const ok = await deleteOrder(id); if (!ok) return;
-        await load(); showToast?.('Заказ удалён','success');
+      tr.querySelector('[data-action="view"]')?.addEventListener('click', async () => {
+        const ord = await fetchOrderById(id);
+        if (!ord) return;
+        openViewModal(ord);
       });
-      tr.querySelector('.btn-send') ?.addEventListener('click', () => onSendOrder(id));
-      tr.querySelector('.btn-recv') ?.addEventListener('click', () => onReceiveOrder(id));
+
+      tr.querySelector('[data-action="delete"]')?.addEventListener('click', async () => {
+        if (!(await showConfirm?.('Удалить заказ перемещения?', 'Подтверждение'))) return;
+        const ok = await deleteOrder(id);
+        if (!ok) return;
+        await load();
+        showToast?.('Заказ удалён', 'success');
+      });
 
       tbody.appendChild(tr);
     }
   }
 
-  // ===== Просмотр заказа =====
-  const badgeClass = (st)=> st==='done'?'status-finished':(st==='created'?'status-created':'');
-  function openView(order) {
-    if (!modalView || !modalViewBody) return;
-    const rid  = order.Route?.ID ?? '—';
-    const trID = order.Route?.Transit?.ID ?? '—';
-    const edh  = order.Route?.Edh != null ? `${order.Route.Edh} ч` : '—';
-    const createdAt = fmtDateSafe(order.CreatedAt);
-    const ead = fmtDateSafe(order.Ead);
-    const asd = fmtDateSafe(order.Asd ?? order.ActualShipmentDate);
-    const aad = fmtDateSafe(order.Aad ?? order.ClosedAt);
+  // ===== маршруты / транзит =====
+  function candidateRoutes(fromId, toId) {
+    if (!Array.isArray(cache.routes)) return [];
+    const f = Number(fromId), t = Number(toId);
+    return cache.routes.filter(r =>
+      (r.From?.ID ?? r.FromID) === f && (r.To?.ID ?? r.ToID) === t
+    );
+  }
 
-    const batchesHTML = (order.Batches ?? []).map((b, idx) => {
-      const rows = (b.Items || []).map(it => {
-        const cid   = it.Component?.ID ?? it.Component_ID;
-        const cname = it.Component?.Name ?? '';
-        const pcw   = weightOf(cid);
-        const w     = pcw * (Number(it.Quantity)||0);
-        return `
-          <tr>
-            <td>${cname}</td>
-            <td>${it.Quantity}</td>
-            <td>${pcw.toFixed(3)}</td>
-            <td>${w.toFixed(3)}</td>
-          </tr>
-        `;
-      }).join('');
-      const bw = (b.Items || []).reduce((s, it)=> s + weightOf(it.Component?.ID ?? it.Component_ID)*(Number(it.Quantity)||0), 0);
-      return `
-        <div class="card" style="margin-bottom:1rem;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;">
-            <h4 style="margin:0;">Партия ${idx+1}</h4>
-            <div class="status-badge ${badgeClass(b.Status)}">${statusText(b.Status)}</div>
-          </div>
-          <div class="table-wrap">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>ТМЦ</th>
-                  <th style="width:12ch;">Кол-во</th>
-                  <th style="width:12ch;">Вес 1 шт, кг</th>
-                  <th style="width:14ch;">Вес, кг</th>
-                </tr>
-              </thead>
-              <tbody>${rows || `<tr><td colspan="4" class="text-muted">Нет позиций</td></tr>`}</tbody>
-              <tfoot>
-                <tr>
-                  <td colspan="3" style="text-align:right;font-weight:600;">Вес партии:</td>
-                  <td style="font-weight:600;">${bw.toFixed(3)} кг</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </div>
-      `;
+  function fillTransitSelect(options) {
+    if (!selTransit) return;
+
+    if (!Array.isArray(options) || options.length === 0) {
+      selTransit.innerHTML = `<option>Маршрут не найден</option>`;
+      selTransit.disabled = true;
+      selTransit.classList.add('is-disabled');
+      routeInfo.id.value = '';
+      routeInfo.name.textContent = '—';
+      routeInfo.eta.textContent  = '—';
+      routeInfo.capacity.textContent = '—';
+      return;
+    }
+
+    selTransit.innerHTML = options.map(r => {
+      const trName = r.Transit?.Name || 'Транзитный склад';
+      return `<option value="${r.ID}">${trName}</option>`;
     }).join('');
 
-    modalViewBody.innerHTML = `
-      <div class="card" style="margin-bottom:1rem;">
-        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;">
-          <div><strong>ID заказа:</strong> #${order.ID ?? '—'}</div>
-          <div><strong>Статус:</strong> ${statusText(order.Status)}</div>
-          <div><strong>ID маршрута:</strong> ${rid}</div>
-          <div><strong>ID транзита:</strong> ${trID}</div>
-          <div><strong>EDH:</strong> ${edh}</div>
-          <div><strong>Создан:</strong> ${createdAt}</div>
-          <div><strong>Ожидается:</strong> ${ead}</div>
-          <div><strong>Отправлен:</strong> ${asd}</div>
-          <div><strong>Получен:</strong> ${aad}</div>
-          <div><strong>Заметки:</strong> ${order.Notes ?? '—'}</div>
-        </div>
-      </div>
-      ${batchesHTML || `<div class="text-muted">Партии отсутствуют</div>`}
-    `;
-    modalView.classList.remove('hidden');
-    modalView.setAttribute('aria-hidden','false');
-    document.body.style.overflow = 'hidden';
+    selTransit.disabled = false;
+    selTransit.classList.remove('is-disabled');
+
+    const pickedRoute = options[0];
+    if (pickedRoute) applyPickedRoute(pickedRoute);
   }
-  function closeView() {
-    if (!modalView) return;
-    modalView.classList.add('hidden');
-    modalView.setAttribute('aria-hidden','true');
-    document.body.style.overflow = '';
+
+  function applyPickedRoute(route) {
+    if (!route) {
+      routeInfo.id.value = '';
+      routeInfo.name.textContent = '—';
+      routeInfo.eta.textContent  = '—';
+      routeInfo.capacity.textContent = '—';
+      return;
+    }
+    routeInfo.id.value = String(route.ID ?? route.Route_ID ?? '');
+    const fromN = route.From?.Name || `#${route.From?.ID ?? ''}`;
+    const toN   = route.To?.Name   || `#${route.To?.ID ?? ''}`;
+    routeInfo.name.textContent = `${fromN} → ${toN}`;
+    routeInfo.eta.textContent  = route.Edh ? `${route.Edh} ч` : '—';
+    const cap = route.Transit?.Capacity ?? null;
+    routeInfo.capacity.textContent = (cap != null) ? `${cap} кг` : '—';
   }
-  modalViewClose?.addEventListener('click', closeView);
-  modalView?.addEventListener('click', (e) => {
-    const content = modalView.querySelector('.modal-content');
-    if (e.target === modalView && !content.contains(e.target)) closeView();
-  });
-  window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && modalView && !modalView.classList.contains('hidden')) closeView();
+
+  function onChangeFromTo() {
+    const f = parseInt(selFrom?.value || '0', 10);
+    const t = parseInt(selTo?.value   || '0', 10);
+    if (!f || !t || f === t) {
+      fillTransitSelect([]);
+      return;
+    }
+    const routes = candidateRoutes(f, t);
+    fillTransitSelect(routes);
+  }
+
+  selTransit?.addEventListener('change', () => {
+    const rid = parseInt(selTransit.value || '0', 10);
+    const r = (Array.isArray(cache.routes) ? cache.routes.find(x => (x.ID ?? x.Route_ID) === rid) : null);
+    applyPickedRoute(r || null);
   });
 
-  // ===== Селекты и маршрут =====
+  // ===== компоненты / вес =====
+  function weightOfComponent(componentOrId) {
+    if (componentOrId && typeof componentOrId === 'object' && typeof componentOrId.Weight === 'number') {
+      return componentOrId.Weight || 0;
+    }
+    const cid = Number(componentOrId);
+    const c = Array.isArray(cache.components) ? cache.components.find(x => x.ID === cid) : null;
+    return c ? (c.Weight || 0) : 0;
+  }
+
+  function computeTotalWeightFromRows() {
+    if (!items.body) return 0;
+    let sum = 0;
+    const rows = items.body.querySelectorAll('tr');
+    rows.forEach(r => {
+      const sel = r.querySelector('.move-item-component');
+      const qtyEl = r.querySelector('.move-item-qty');
+      const cid = parseInt(sel?.value || '0', 10);
+      const qty = parseInt(qtyEl?.value || '0', 10);
+      if (cid > 0 && qty > 0) sum += weightOfComponent(cid) * qty;
+    });
+    return sum;
+  }
+
+  function ensureTotalWeightEl() {
+    if (totalWeightEl) return;
+    const routeInfoWrap = document.getElementById('move-route-info');
+    if (!routeInfoWrap) return;
+    totalWeightEl = document.createElement('div');
+    totalWeightEl.innerHTML = `<strong>Вес заказа:</strong> <span id="move-total-weight">0</span>`;
+    routeInfoWrap.appendChild(totalWeightEl);
+  }
+
+  function updateTotalWeightUi() {
+    ensureTotalWeightEl();
+    const span = document.getElementById('move-total-weight');
+    if (span) span.textContent = String(computeTotalWeightFromRows());
+  }
+
+  // ===== селекты справочников =====
   function fillWarehouseSelect(sel, list) {
     if (!sel) return;
     if (!Array.isArray(list) || list.length === 0) {
       sel.innerHTML = `<option value="">Нет складов</option>`;
       return;
     }
-    sel.innerHTML = list.map(w => `<option value="${w.ID}">${w.Name}${w.Location ? ' — ' + w.Location : ''}</option>`).join('');
+    sel.innerHTML = list.map(w =>
+      `<option value="${w.ID}">${w.Name}${w.Location ? ' — ' + w.Location : ''}</option>`
+    ).join('');
   }
   function fillComponentsSelect(sel, list) {
     if (!sel) return;
@@ -303,339 +307,417 @@ export function initOrders({ showToast, showConfirm }) {
     }
     sel.innerHTML = list.map(c => `<option value="${c.ID}">${c.Name}</option>`).join('');
   }
-  function findRoutesBetween(fromId, toId) {
-    const f = Number(fromId), t = Number(toId);
-    return (cache.routes || []).filter(r => (r.From?.ID ?? r.FromID) === f && (r.To?.ID ?? r.ToID) === t);
-  }
-  function disableTransitSelect(placeholderText) {
-    selTransit.disabled = true;
-    selTransit.innerHTML = `<option selected>${placeholderText}</option>`;
-    selTransit.style.color = '#9ca3af';
-    setRouteInfo(null);
-  }
-  function enableTransitSelect() {
-    selTransit.disabled = false;
-    selTransit.style.color = '';
-  }
-  function rebuildTransitForPair() {
-    const f = parseInt(selFrom?.value || '0', 10);
-    const t = parseInt(selTo?.value   || '0', 10);
-    if (!f || !t || f === t) { disableTransitSelect('Выберите склады'); return; }
-    const routes = findRoutesBetween(f, t);
-    if (!routes.length) { disableTransitSelect('Маршрутов нет'); return; }
-    enableTransitSelect();
-    selTransit.innerHTML = routes.map(r => {
-      const rid = r.ID ?? r.Route_ID;
-      const trName = r.Transit?.Name || 'Транзитный склад';
-      return `<option value="${rid}">${trName}</option>`;
-    }).join('');
-    updateRouteInfoFromSelect();
-    recalcTotalWeight();
-  }
-  function updateRouteInfoFromSelect() {
-    const rid = parseInt(selTransit?.value || '0', 10);
-    const route = (cache.routes || []).find(r => (r.ID ?? r.Route_ID) === rid) || null;
-    setRouteInfo(route);
-  }
-  function setRouteInfo(route) {
-    if (!route) {
-      routeInfo.id.value         = '';
-      routeInfo.name.textContent = '';
-      routeInfo.eta.textContent  = '';
-      routeInfo.capacity.textContent = '';
-      return;
-    }
-    const nm  = `${route.From?.Name ?? ''} → ${route.To?.Name ?? ''}`.trim();
-    const edh = route.Edh != null ? `${route.Edh} ч` : '';
-    const cap = route.Transit?.Capacity != null ? `${route.Transit.Capacity} кг` : '';
-    routeInfo.id.value         = String(route.ID ?? route.Route_ID ?? '');
-    routeInfo.name.textContent = nm;
-    routeInfo.eta.textContent  = edh;
-    routeInfo.capacity.textContent = cap;
-  }
 
-  // ===== Позиции + Итого вес =====
-  function ensureTotalWeightEl() {
-    if (totalWeightEl) return totalWeightEl;
-    const wrap = document.getElementById('move-items-table')?.closest('.card');
-    const el = document.createElement('div');
-    el.id = 'move-total-weight';
-    el.className = 'mt-2';
-    el.style.fontWeight = '600';
-    el.style.textAlign  = 'right';
-    el.textContent = 'Итого вес: 0 кг';
-    wrap?.appendChild(el);
-    totalWeightEl = el;
-    return el;
-  }
-  function recalcTotalWeight() {
-    const sum = calcTotalWeight(collectItems());
-    ensureTotalWeightEl().textContent = `Итого вес: ${sum.toFixed(3)} кг`;
-  }
-  function attachRowListeners(tr) {
-    tr.querySelector('.move-item-component')?.addEventListener('change', recalcTotalWeight);
-    tr.querySelector('.move-item-qty')?.addEventListener('input', recalcTotalWeight);
-  }
+  // ===== строки позиций =====
   function toggleItemsEmpty() {
     if (!items.body || !items.empty) return;
-    const has = items.body.querySelector('tr') != null;
-    items.empty.style.display = has ? 'none' : '';
+    const hasRows = items.body.querySelector('tr') != null;
+    items.empty.style.display = hasRows ? 'none' : '';
   }
+
   function addItemRow() {
+    if (!items.body) return;
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td><select class="move-item-component" required></select></td>
-      <td><input type="number" class="move-item-qty" min="1" step="1" value="1" required></td>
-      <td><button type="button" class="btn btn-danger btn-remove">Удалить</button></td>
+      <td>
+        <select class="move-item-component" required></select>
+      </td>
+      <td>
+        <input type="number" class="move-item-qty" min="1" step="1" value="1" required>
+      </td>
+      <td>
+        <button type="button" class="btn btn-danger btn-small btn-remove">Удалить</button>
+      </td>
     `;
     items.body.appendChild(tr);
-    fillComponentsSelect(tr.querySelector('.move-item-component'), cache.components);
-    tr.querySelector('.btn-remove')?.addEventListener('click', () => { tr.remove(); toggleItemsEmpty(); recalcTotalWeight(); });
-    attachRowListeners(tr);
+
+    const sel = tr.querySelector('.move-item-component');
+    const qty = tr.querySelector('.move-item-qty');
+
+    fillComponentsSelect(sel, cache.components);
+
+    sel?.addEventListener('change', updateTotalWeightUi);
+    qty?.addEventListener('input', updateTotalWeightUi);
+
+    tr.querySelector('.btn-remove')?.addEventListener('click', () => {
+      tr.remove();
+      toggleItemsEmpty();
+      updateTotalWeightUi();
+    });
+
     toggleItemsEmpty();
-    recalcTotalWeight();
+    updateTotalWeightUi();
   }
 
-  // ===== Авто-разбиение на партии (без выбора пользователем) =====
-// Возвращает { batches, n } или null, если существует единица товара тяжелее capacity
-function autoPack(itemsPayload, capacityKg) {
-  const EPS = 1e-9;
-
-  // 1) проверка: если хотя бы ОДНА штука какого-то компонента тяжелее capacity — разложить невозможно
-  for (const it of itemsPayload) {
-    const uw = weightOf(it.componentId); // вес одной штуки
-    if (uw - capacityKg > EPS && it.quantity > 0) {
-      return null;
-    }
-  }
-
-  // 2) считаем минимально возможное число партий по суммарному весу
-  const total = calcTotalWeight(itemsPayload);
-  const minBatches = capacityKg > 0 ? Math.max(1, Math.ceil(total / capacityKg)) : 1;
-
-  // 3) строим партии, деля quantity по мере заполнения
-  const batches = buildBatchesSplit(itemsPayload, capacityKg);
-  return { batches, n: Math.max(minBatches, batches.length) };
-}
-
-// Деление quantity: greedy по “ведру” с остаточной вместимостью.
-// Партия заполняется по максимуму; если не помещается — создаём новую партию.
-// Позиции с нулевым весом (uw === 0) не занимают вместимость и целиком идут в текущую партию.
-function buildBatchesSplit(itemsPayload, capacityKg) {
-  const EPS = 1e-9;
-
-  // текущая партия
-  let current = { items: [], weight: 0 };
-  let remain  = capacityKg;              // остаток по весу в текущей партии
-  const out   = [];
-
-  const pushBatch = () => {
-    // не добавляем пустые партии
-    if (current.items.length) out.push(current);
-    current = { items: [], weight: 0 };
-    remain  = capacityKg;
-  };
-
-  // идём в порядке как есть — при необходимости можно сортировать
-  for (const src of itemsPayload) {
-    let qtyLeft = Number(src.quantity) || 0;
-    const cid   = src.componentId;
-    const uw    = Number(weightOf(cid)) || 0; // вес 1 шт
-
-    if (qtyLeft <= 0) continue;
-
-    if (uw === 0) {
-      // весь объём без веса — можно положить целиком в текущую партию
-      current.items.push({ componentId: cid, quantity: qtyLeft });
-      // вес не меняется
-      continue;
-    }
-
-    // uw > 0 — делим по партиям
-    while (qtyLeft > 0) {
-      // если в текущей партии нет места — открываем новую
-      if (remain <= EPS) {
-        pushBatch();
+  function collectItems() {
+    if (!items.body) return [];
+    const rows = [...items.body.querySelectorAll('tr')];
+    const out = [];
+    for (const r of rows) {
+      const sel = r.querySelector('.move-item-component');
+      const qtyEl = r.querySelector('.move-item-qty');
+      const cid = parseInt(sel?.value || '0', 10);
+      const qty = parseInt(qtyEl?.value || '0', 10);
+      if (cid > 0 && Number.isFinite(qty) && qty > 0) {
+        out.push({ componentId: cid, quantity: qty });
       }
+    }
+    return out;
+  }
 
-      // сколько штук помещается сейчас
-      const fitNow = Math.floor((remain + EPS) / uw); // целых штук
-      if (fitNow <= 0) {
-        // несмотря на remain>EPS может не помещаться из-за численных эффектов — откроем новую
-        pushBatch();
+  // ===== авто-упаковка по партиям =====
+  function packIntoBatches(itemsFlat, maxWeight, batchesCount) {
+    const batches = Array.from({ length: batchesCount }, () => ({ items: [], weight: 0 }));
+
+    function pushToBatch(bi, cid, qty, unitW) {
+      if (qty <= 0) return;
+      const b = batches[bi];
+      const ex = b.items.find(x => x.componentId === cid);
+      if (ex) ex.quantity += qty;
+      else b.items.push({ componentId: cid, quantity: qty });
+      b.weight += unitW * qty;
+    }
+
+    for (const it of itemsFlat) {
+      const cid = it.componentId;
+      let qLeft = it.quantity;
+      const w = weightOfComponent(cid);
+
+      if (w <= 0) {
+        let bi = 0;
+        while (qLeft > 0) {
+          const take = qLeft;
+          pushToBatch(bi, cid, take, 0);
+          qLeft -= take;
+          bi = (bi + 1) % batches.length;
+        }
         continue;
       }
 
-      const take = Math.min(qtyLeft, fitNow);
-      current.items.push({ componentId: cid, quantity: take });
-      current.weight += take * uw;
-      remain         -= take * uw;
-      qtyLeft        -= take;
-    }
-  }
-
-  // дописываем последнюю партию
-  pushBatch();
-
-  return out;
-}
-
-  // упаковка в фиксированное N партий
-  function splitFFD(itemsPayload, capacityKg, targetN) {
-    const clones = itemsPayload.map(it => ({ ...it }));
-    clones.sort((a,b) => calcItemWeight(b.componentId,b.quantity) - calcItemWeight(a.componentId,a.quantity));
-    const batches = Array.from({ length: targetN }, () => ({ items: [], weight: 0 }));
-    for (const it of clones) {
-      const w = calcItemWeight(it.componentId, it.quantity);
-      let placed = false;
-      for (const b of batches) {
-        if (b.weight + w <= capacityKg + 1e-9) {
-          b.items.push(it);
-          b.weight += w;
-          placed = true;
-          break;
+      let bi = 0;
+      while (qLeft > 0) {
+        const room = Math.max(0, Math.floor((maxWeight - batches[bi].weight) / w));
+        if (room > 0) {
+          const take = Math.min(room, qLeft);
+          pushToBatch(bi, cid, take, w);
+          qLeft -= take;
+        }
+        if (qLeft > 0) {
+          bi = (bi + 1) % batches.length;
+          if (batches.every(b => (maxWeight - b.weight) < w)) {
+            return [];
+          }
         }
       }
-      if (!placed) return null;
     }
+
     return batches.map(b => ({ items: b.items }));
   }
 
-  // ===== Сабмит создания заказа =====
-  submitBtn?.addEventListener('click', async () => {
-    const fromId  = parseInt(selFrom?.value || '0', 10);
-    const toId    = parseInt(selTo?.value   || '0', 10);
-    const routeId = parseInt(routeInfo.id?.value || '0', 10);
+  // ===== модалка разбиения на партии =====
+  let splitModal = null;
+  function ensureSplitModal() {
+    if (splitModal) return splitModal;
+    splitModal = document.createElement('div');
+    splitModal.className = 'modal hidden';
+    splitModal.setAttribute('aria-hidden', 'true');
+    splitModal.innerHTML = `
+      <div class="modal-content" style="max-width:520px">
+        <h3 class="mb-4">Разбить заказ на партии</h3>
+        <div class="mb-3">
+          <div class="text-muted">Вес заказа превышает вместимость транзитного склада.</div>
+          <div class="mt-1">Предлагаемое количество партий: <strong id="split-suggest"></strong></div>
+        </div>
+        <div class="mb-4" style="display:flex;align-items:center;gap:.75rem;">
+          <label for="split-count">Количество партий</label>
+          <input id="split-count" type="number" min="1" step="1" value="1" style="width:10ch">
+        </div>
+        <div class="flex justify-end" style="gap:8px;">
+          <button type="button" class="btn" id="split-cancel">Отмена</button>
+          <button type="button" class="btn btn-primary" id="split-apply">Продолжить</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(splitModal);
 
-    if (!fromId || !toId) { showToast?.('Выберите отправителя и получателя'); return; }
-    if (fromId === toId)  { showToast?.('Отправитель и получатель не могут совпадать'); return; }
-    if (!routeId)         { showToast?.('Маршрут не выбран'); return; }
-
-    const itemsPayload = collectItems();
-    if (itemsPayload.length === 0) { showToast?.('Добавьте хотя бы одну позицию'); return; }
-
-    const route    = (cache.routes || []).find(r => (r.ID ?? r.Route_ID) === routeId) || null;
-    const capacity = route?.Transit?.Capacity != null ? Number(route.Transit.Capacity) : 0;
-    const total    = calcTotalWeight(itemsPayload);
-
-    // Если нет известной вместимости либо всё влезает — одна партия
-    if (!(capacity > 0) || total <= capacity + 1e-9) {
-      const ok = await createOrderWithBatches({
-        routeId,
-        notes: String(notesEl?.value || '').trim(),
-        batches: [{ items: itemsPayload.map(it => ({ componentId: it.componentId, quantity: it.quantity })) }],
-      });
-      if (!ok) return;
-      hideCreate(); await load();
-      showToast?.('Заказ создан','success');
-      return;
-    }
-
-    // Есть ограничение и не влезает — режем сами на минимум партий
-    const packed = autoPack(itemsPayload, capacity);
-    if (!packed) {
-      // единственный случай, когда сообщаем — когда физически невозможно разложить
-      showToast?.('Есть позиция тяжелее вместимости выбранного транзита. Уменьшите количество или выберите другой маршрут.');
-      return;
-    }
-
-    // Спросить только «Согласны разбить на N партий?» — Да/Нет
-    const agree = await showConfirm?.(
-      `Вес заказа ${total.toFixed(3)} кг больше вместимости транзитного склада ${capacity.toFixed(3)} кг.\n` +
-      `Разбить заказ на ${packed.n} партий автоматически?`,
-      'Разбить на партии'
-    );
-    if (!agree) { hideCreate(); return; }
-
-    const ok = await createOrderWithBatches({
-      routeId,
-      notes: String(notesEl?.value || '').trim(),
-      batches: packed.batches.map(b => ({ items: b.items.map(it => ({ componentId: it.componentId, quantity: it.quantity })) })),
+    splitModal.addEventListener('click', (e) => {
+      const content = splitModal.querySelector('.modal-content');
+      if (e.target === splitModal && !content.contains(e.target)) hideSplitModal();
     });
-    if (!ok) return;
-    hideCreate(); await load();
-    showToast?.('Заказ создан (автоматически разбит на партии)','success');
-  });
 
-  // ===== Показ/закрытие модалки создания =====
-  function showCreate() {
-    modalCreate.classList.remove('hidden');
-    modalCreate.setAttribute('aria-hidden','false');
-    document.body.style.overflow = 'hidden';
+    splitModal.querySelector('#split-cancel')?.addEventListener('click', hideSplitModal);
+    return splitModal;
   }
-  function hideCreate() {
-    modalCreate.classList.add('hidden');
-    modalCreate.setAttribute('aria-hidden','true');
+  function showSplitModal(suggestCount, onApply) {
+    const m = ensureSplitModal();
+    m.classList.remove('hidden');
+    m.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    const sug = m.querySelector('#split-suggest');
+    const inp = m.querySelector('#split-count');
+    if (sug) sug.textContent = String(suggestCount);
+    if (inp) inp.value = String(suggestCount);
+    const applyBtn = m.querySelector('#split-apply');
+    applyBtn.onclick = () => {
+      const n = parseInt(inp.value || '0', 10);
+      if (!Number.isFinite(n) || n < 1) return;
+      onApply?.(n);
+    };
+  }
+  function hideSplitModal() {
+    if (!splitModal) return;
+    splitModal.classList.add('hidden');
+    splitModal.setAttribute('aria-hidden', 'true');
     document.body.style.overflow = '';
   }
 
-  // ===== Публичный openCreate =====
+  // ===== OPEN modal (создание) =====
   async function openCreate() {
-    const [wh, rts, tmc] = await Promise.all([
-      cache.warehouses.length ? Promise.resolve(cache.warehouses) : fetchWarehouses(),
-      cache.routes.length     ? Promise.resolve(cache.routes)     : fetchRoutes(),
-      cache.components.length ? Promise.resolve(cache.components) : fetchComponents(),
-    ]);
-
-    if (Array.isArray(wh))  cache.warehouses = wh;
-    if (Array.isArray(rts)) cache.routes     = rts;
-    if (Array.isArray(tmc)) cache.components = tmc;
-
-    cache.componentsIndex.clear();
-    for (const c of cache.components) cache.componentsIndex.set(c.ID, c);
+    if (!cache.warehouses.length) cache.warehouses = await fetchWarehouses();
+    if (!cache.routes.length)     cache.routes     = await fetchRoutes();
+    if (!cache.components.length) cache.components = await fetchComponents();
 
     fillWarehouseSelect(selFrom, cache.warehouses);
     fillWarehouseSelect(selTo,   cache.warehouses);
 
-    selFrom.onchange    = rebuildTransitForPair;
-    selTo.onchange      = rebuildTransitForPair;
-    selTransit.onchange = updateRouteInfoFromSelect;
-
-    disableTransitSelect('Выберите склады');
+    routeInfo.id.value = '';
+    routeInfo.name.textContent = '—';
+    routeInfo.eta.textContent  = '—';
+    routeInfo.capacity.textContent = '—';
+    fillTransitSelect([]);
 
     items.body.innerHTML = '';
     toggleItemsEmpty();
     addItemRow();
-
     notesEl.value = '';
-    ensureTotalWeightEl();
-    recalcTotalWeight();
+    updateTotalWeightUi();
 
-    showCreate();
+    selFrom?.removeEventListener('change', onChangeFromTo);
+    selTo?.removeEventListener('change', onChangeFromTo);
+    selFrom?.addEventListener('change', onChangeFromTo);
+    selTo?.addEventListener('change', onChangeFromTo);
+
+    showCreateModal();
+  }
+  function showCreateModal() {
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+  function hideCreateModal() {
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
   }
 
-  // ===== Загрузка таблицы =====
+  // ===== SUBMIT (создание) =====
+  submitBtn?.addEventListener('click', async () => {
+    const fromId = parseInt(selFrom?.value || '0', 10);
+    const toId   = parseInt(selTo?.value   || '0', 10);
+
+    if (!fromId || !toId) { showToast?.('Выберите склады отправителя и получателя'); return; }
+    if (fromId === toId)  { showToast?.('Отправитель и получатель не могут совпадать'); return; }
+
+    const routes = candidateRoutes(fromId, toId);
+    if (routes.length === 0) { showToast?.('Маршрут между выбранными складами не найден'); return; }
+
+    let pickedRoute = null;
+    if (!selTransit.disabled) {
+      const rid = parseInt(selTransit.value || '0', 10);
+      pickedRoute = routes.find(r => (r.ID ?? r.Route_ID) === rid) || routes[0];
+    } else {
+      pickedRoute = routes[0];
+    }
+    if (!pickedRoute) { showToast?.('Маршрут не выбран'); return; }
+
+    const itemsPayload = collectItems();
+    if (itemsPayload.length === 0) { showToast?.('Добавьте хотя бы одну позицию с количеством'); return; }
+
+    const capacity = pickedRoute.Transit?.Capacity ?? null;
+    const totalWeight = computeTotalWeightFromRows();
+
+    const basePayload = {
+      routeId:   pickedRoute.ID ?? pickedRoute.Route_ID,
+      transitId: pickedRoute.Transit?.ID ?? pickedRoute.TransitID,
+      notes:     String(notesEl?.value || '').trim(),
+    };
+
+    const singleBatches = [{ items: itemsPayload }];
+
+    if (capacity == null || capacity <= 0 || totalWeight <= capacity) {
+      const ok = await createOrderWithBatches({ ...basePayload, batches: singleBatches });
+      if (!ok) return;
+      hideCreateModal();
+      await load();
+      showToast?.('Заказ создан', 'success');
+      return;
+    }
+
+    const suggested = Math.ceil(totalWeight / capacity);
+    showSplitModal(suggested, async (userCount) => {
+      const packed = packIntoBatches(itemsPayload, capacity, userCount);
+      if (!Array.isArray(packed) || packed.length === 0) {
+        showToast?.('Не удалось упаковать заказ в заданное число партий');
+        return;
+      }
+      hideSplitModal();
+      const ok = await createOrderWithBatches({ ...basePayload, batches: packed });
+      if (!ok) return;
+      hideCreateModal();
+      await load();
+      showToast?.('Заказ создан (разбит на партии)', 'success');
+    });
+  });
+
+  // ===== Модалка ПРОСМОТРА заказа =====
+  function showViewModal() {
+    if (!modalView) return;
+    modalView.classList.remove('hidden');
+    modalView.setAttribute('aria-hidden','false');
+    document.body.style.overflow = 'hidden';
+  }
+  function hideViewModal() {
+    if (!modalView) return;
+    modalView.classList.add('hidden');
+    modalView.setAttribute('aria-hidden','true');
+    document.body.style.overflow = '';
+  }
+  modalViewClose?.addEventListener('click', hideViewModal);
+
+  function statusBadge(status) {
+    // используем имеющиеся классы: status-badge, status-created, status-finished
+    const mapText = { created: 'Создана', running: 'В пути', done: 'Завершена' };
+    const cls = (status === 'done') ? 'status-finished' : 'status-created';
+    return `<span class="status-badge ${cls}">${mapText[status] ?? status}</span>`;
+    // (если нужен отдельный стиль для running — добавь .status-running в CSS)
+  }
+
+  function renderOrderView(order) {
+    const id    = order.ID;
+    const route = order.Route || {};
+    const tr    = route.Transit || {};
+    const fromN = route.From?.Name || `#${route.From?.ID ?? ''}`;
+    const toN   = route.To?.Name   || `#${route.To?.ID ?? ''}`;
+    const trN   = tr.Name || `#${tr.ID ?? ''}`;
+    const eta   = (route.Edh ?? '') ? `${route.Edh} ч` : '—';
+
+    const batches = Array.isArray(order.Batches) ? order.Batches : [];
+
+    const batchWeights = batches.map(b => {
+      let w = 0;
+      (b.Items||[]).forEach(it => { w += (weightOfComponent(it.Component) * (it.Quantity||0)); });
+      return w;
+    });
+    const totalWeight = batchWeights.reduce((a,b)=>a+b,0);
+
+    const batchesHTML = batches.map((b, idx) => {
+      const bWeight = batchWeights[idx] || 0;
+      const rows = (b.Items||[]).map(it => {
+        const cw = weightOfComponent(it.Component);
+        const qty= it.Quantity || 0;
+        const rowWeight = cw*qty;
+        return `
+          <tr>
+            <td>${it.Component?.Name ?? `#${it.Component?.ID ?? ''}`}</td>
+            <td>${qty}</td>
+            <td>${cw}</td>
+            <td>${rowWeight}</td>
+          </tr>
+        `;
+      }).join('');
+
+      // только кнопки, без селекта:
+      // created -> button "Отправить" (running)
+      // running -> button "Принять"  (done)
+      // done    -> без кнопки
+      let actionBtn = '';
+      if (b.Status === 'created') {
+        actionBtn = `<button class="btn btn-primary btn-small" data-action="next-status" data-next="running">Отправить</button>`;
+      } else if (b.Status === 'running') {
+        actionBtn = `<button class="btn btn-primary btn-small" data-action="next-status" data-next="done">Принять</button>`;
+      }
+
+      return `
+        <div class="card mb-3" data-batch-id="${b.ID}">
+          <div class="flex justify-between items-center mb-2">
+            <div class="flex items-center gap-3">
+              <strong>Партия #${b.ID}</strong>
+              ${statusBadge(b.Status)}
+              ${actionBtn}
+            </div>
+            <div><strong>Вес партии:</strong> ${bWeight}</div>
+          </div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>ТМЦ</th>
+                  <th style="width:10ch;">Кол-во</th>
+                  <th style="width:12ch;">Вес ед.</th>
+                  <th style="width:12ch;">Вес, итого</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rows || `<tr><td colspan="4" class="text-muted">Нет позиций</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    modalViewBody.innerHTML = `
+      <div class="mb-3">
+        <div><strong>Заказ #${id}</strong></div>
+        <div class="text-muted">${fromN} → ${toN} (транзит: ${trN}, ETA: ${eta})</div>
+        <div class="mt-1"><strong>Вес заказа:</strong> ${totalWeight}</div>
+      </div>
+      ${batchesHTML || `<div class="text-muted">Нет партий</div>`}
+    `;
+
+    // делегирование действий по партиям — только кнопки
+    modalViewBody.querySelectorAll('.card[data-batch-id]').forEach(card => {
+      const batchId = parseInt(card.getAttribute('data-batch-id'),10);
+      card.querySelector('[data-action="next-status"]')?.addEventListener('click', async (e) => {
+        const newStatus = e.currentTarget.getAttribute('data-next');
+        const ok = await updateBatchStatus(order.ID, batchId, newStatus);
+        if (!ok) return;
+        showToast?.('Статус партии обновлён', 'success');
+        const fresh = await fetchOrderById(order.ID);
+        if (fresh) {
+          renderOrderView(fresh);
+          await load();
+        }
+      });
+    });
+  }
+
+  async function openViewModal(order) {
+    if (!cache.components.length) {
+      try { cache.components = await fetchComponents(); } catch {}
+    }
+    renderOrderView(order);
+    showViewModal();
+  }
+
+  // ===== LOAD =====
   async function load() {
     if (!tbody) return;
     tbody.innerHTML = '';
-
-    // заранее подгружаем ТМЦ для веса
-    if (!cache.components.length) {
-      const tmc = await fetchComponents();
-      if (Array.isArray(tmc)) {
-        cache.components = tmc;
-        cache.componentsIndex.clear();
-        for (const c of cache.components) cache.componentsIndex.set(c.ID, c);
-      }
-    }
-
     try {
       const list = await fetchOrders();
       renderList(list);
-    } catch { renderEmpty(); }
+    } catch {
+      renderEmpty();
+    }
   }
 
-  // Закрытия по фону/ESC
-  modalCreate?.addEventListener('click', (e) => {
-    const content = modalCreate.querySelector('.modal-content');
-    if (e.target === modalCreate && !content.contains(e.target)) hideCreate();
-  });
-  window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !modalCreate.classList.contains('hidden')) hideCreate();
-  });
-
-  // Плюс позиция
-  items.addBtn?.addEventListener('click', addItemRow);
-
+  // ===== экспорт =====
   return { load, openCreate };
 }
+
+/* Подсказка по стилям:
+.is-disabled { opacity:.6; pointer-events:none; background:#f3f4f6; }
+*/
