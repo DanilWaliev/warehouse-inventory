@@ -94,11 +94,19 @@ func (s *MovementOrderService) UpdateBatchStatus(batchId int, orderId int, newSt
 		if err != nil {
 			return err
 		}
+		route, err := s.routeModel.SelectByID(mo.Route.ID)
+		if err != nil {
+			return err
+		}
+		mo.Route = *route
+
 		doc := &models.Document{
 			Type:            "send",
 			MovementOrderID: &mo.ID,
+			StorageID:       &mo.Route.From.ID,
 			CreatedBy:       createdBy,
 		}
+
 		// обновляем статус партии
 		_, err = s.documentModel.InsertMovementSend(doc, batchId)
 		if err != nil {
@@ -129,6 +137,7 @@ func (s *MovementOrderService) UpdateBatchStatus(batchId int, orderId int, newSt
 		doc := &models.Document{
 			Type:            "receive",
 			MovementOrderID: &mo.ID,
+			StorageID:       &mo.Route.To.ID,
 			CreatedBy:       createdBy,
 		}
 

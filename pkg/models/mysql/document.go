@@ -780,6 +780,10 @@ func (m *DocumentModel) InsertMovementSend(d *models.Document, batchID int) (*mo
 	if batchID <= 0 {
 		return nil, errors.New("invalid batch id for send document")
 	}
+	// требуем склад
+	if d.StorageID == nil || *d.StorageID <= 0 {
+		return nil, errors.New("storage required for send document")
+	}
 
 	tx, err := m.DB.Begin()
 	if err != nil {
@@ -787,7 +791,6 @@ func (m *DocumentModel) InsertMovementSend(d *models.Document, batchID int) (*mo
 	}
 	defer tx.Rollback()
 
-	// 1) Берём партию под блокировку и узнаём заказ и текущий статус.
 	var orderID int
 	var curStatus string
 	if err := tx.QueryRow(`
@@ -805,13 +808,11 @@ func (m *DocumentModel) InsertMovementSend(d *models.Document, batchID int) (*mo
 		return nil, fmt.Errorf("batch %d must be in status 'created' to send (got %s)", batchID, curStatus)
 	}
 
-	// 2) Маршрут заказа (From / To / Transit).
 	fromID, _, transitID, err := getRouteSiteIDsByOrderIDTx(tx, orderID)
 	if err != nil {
 		return nil, err
 	}
 
-	// 3) Агрегируем позиции партии.
 	compQty, err := sumBatchItemsTx(tx, batchID)
 	if err != nil {
 		return nil, err
@@ -820,7 +821,6 @@ func (m *DocumentModel) InsertMovementSend(d *models.Document, batchID int) (*mo
 		return nil, fmt.Errorf("batch %d has no items", batchID)
 	}
 
-	// 4) Проверка вместимости транзита по весу + движение From -> Transit.
 	if err := checkTransitCapacityByWeightTx(tx, transitID, compQty); err != nil {
 		return nil, err
 	}
@@ -828,13 +828,12 @@ func (m *DocumentModel) InsertMovementSend(d *models.Document, batchID int) (*mo
 		return nil, err
 	}
 
-	// 5) Создаём документ 'send' (StorageSite_ID = NULL, MovementOrder_Order_ID = orderID).
-	docID, err := m.insertDocumentHeaderTx(tx, "send", d.CreatedBy, d.Notes, &orderID, nil, nil)
+	// ТЕПЕРЬ: прокидываем d.StorageID
+	docID, err := m.insertDocumentHeaderTx(tx, "send", d.CreatedBy, d.Notes, &orderID, nil, d.StorageID)
 	if err != nil {
 		return nil, err
 	}
 
-	// 6) Позиции документа — то, что реально поехало (агрегировано по компоненту).
 	docItems := make([]models.DocumentItem, 0, len(compQty))
 	for compID, qty := range compQty {
 		if qty <= 0 {
@@ -849,7 +848,6 @@ func (m *DocumentModel) InsertMovementSend(d *models.Document, batchID int) (*mo
 		return nil, err
 	}
 
-	// 7) Смена статуса партии -> 'running'.
 	if _, err := tx.Exec(`
 		UPDATE movementorderbatch
 		   SET Status = 'running'
@@ -858,7 +856,6 @@ func (m *DocumentModel) InsertMovementSend(d *models.Document, batchID int) (*mo
 		return nil, err
 	}
 
-	// 8) Пересчёт статуса заказа по партиям.
 	if err := recomputeOrderStatusTx(tx, orderID); err != nil {
 		return nil, err
 	}
@@ -867,7 +864,6 @@ func (m *DocumentModel) InsertMovementSend(d *models.Document, batchID int) (*mo
 		return nil, err
 	}
 
-	// Заполняем возвращаемую структуру.
 	d.ID = docID
 	d.Type = "send"
 	d.MovementOrderID = &orderID
@@ -898,6 +894,10 @@ func (m *DocumentModel) InsertMovementReceive(d *models.Document, batchID int) (
 	if batchID <= 0 {
 		return nil, errors.New("invalid batch id for receive document")
 	}
+	// требуем склад
+	if d.StorageID == nil || *d.StorageID <= 0 {
+		return nil, errors.New("storage required for receive document")
+	}
 
 	tx, err := m.DB.Begin()
 	if err != nil {
@@ -905,7 +905,6 @@ func (m *DocumentModel) InsertMovementReceive(d *models.Document, batchID int) (
 	}
 	defer tx.Rollback()
 
-	// 1) Берём партию под блокировку и узнаём заказ и текущий статус.
 	var orderID int
 	var curStatus string
 	if err := tx.QueryRow(`
@@ -923,13 +922,11 @@ func (m *DocumentModel) InsertMovementReceive(d *models.Document, batchID int) (
 		return nil, fmt.Errorf("batch %d must be in status 'running' to receive (got %s)", batchID, curStatus)
 	}
 
-	// 2) Маршрут заказа (From / To / Transit).
 	_, toID, transitID, err := getRouteSiteIDsByOrderIDTx(tx, orderID)
 	if err != nil {
 		return nil, err
 	}
 
-	// 3) Агрегируем позиции партии.
 	compQty, err := sumBatchItemsTx(tx, batchID)
 	if err != nil {
 		return nil, err
@@ -938,18 +935,16 @@ func (m *DocumentModel) InsertMovementReceive(d *models.Document, batchID int) (
 		return nil, fmt.Errorf("batch %d has no items", batchID)
 	}
 
-	// 4) Движение инвентаря Transit -> To.
 	if err := moveStockTx(tx, transitID, toID, compQty); err != nil {
 		return nil, err
 	}
 
-	// 5) Создаём документ 'receive' (StorageSite_ID = NULL, MovementOrder_Order_ID = orderID).
-	docID, err := m.insertDocumentHeaderTx(tx, "receive", d.CreatedBy, d.Notes, &orderID, nil, nil)
+	// ТЕПЕРЬ: прокидываем d.StorageID
+	docID, err := m.insertDocumentHeaderTx(tx, "receive", d.CreatedBy, d.Notes, &orderID, nil, d.StorageID)
 	if err != nil {
 		return nil, err
 	}
 
-	// 6) Позиции документа — фактически принятый товар.
 	docItems := make([]models.DocumentItem, 0, len(compQty))
 	for compID, qty := range compQty {
 		if qty <= 0 {
@@ -964,7 +959,6 @@ func (m *DocumentModel) InsertMovementReceive(d *models.Document, batchID int) (
 		return nil, err
 	}
 
-	// 7) Смена статуса партии -> 'done'.
 	if _, err := tx.Exec(`
 		UPDATE movementorderbatch
 		   SET Status = 'done'
@@ -973,7 +967,6 @@ func (m *DocumentModel) InsertMovementReceive(d *models.Document, batchID int) (
 		return nil, err
 	}
 
-	// 8) Пересчёт статуса заказа по партиям.
 	if err := recomputeOrderStatusTx(tx, orderID); err != nil {
 		return nil, err
 	}
@@ -982,7 +975,6 @@ func (m *DocumentModel) InsertMovementReceive(d *models.Document, batchID int) (
 		return nil, err
 	}
 
-	// Заполняем возвращаемую структуру.
 	d.ID = docID
 	d.Type = "receive"
 	d.MovementOrderID = &orderID
