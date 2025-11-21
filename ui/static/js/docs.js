@@ -57,6 +57,8 @@ const TYPE_RU = {
   receive: 'Приёмка',
   writeoff: 'Списание',
   output: 'Выпуск',
+  productionCreate: 'Начало производства',
+  productionFinish: 'Завершение производства',
 };
 const toRuType = t => TYPE_RU[t] || t;
 
@@ -283,6 +285,16 @@ function renderField(f) {
   return "";
 }
 
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+
 
 /* =========================
    ОТКРЫТЬ ДОКУМЕНТ (СОЗДАНИЕ)
@@ -435,28 +447,112 @@ export async function openDocView(id) {
     const res = await fetch(`/api/document?id=${id}`);
     if (!res.ok) throw 0;
 
-    // НОРМАЛИЗАЦИЯ: массив -> объект
+    // нормализуем: массив -> объект
     const raw = await res.json();
     const doc = Array.isArray(raw) ? (raw[0] || {}) : (raw || {});
 
-    // найти схему по kind (buy/sale), а не по ключу объекта
-    const def = Object.values(DOCS).find(d => d.kind === doc.Type) 
-             || { title: doc.Type, fields: [] };
+    // схема только для buy/sale (пока), остальные типы покажем в "generic" режиме
+    const def = Object.values(DOCS).find(d => d.kind === doc.Type)
+             || { title: toRuType(doc.Type), fields: [] };
 
-    docTitle.textContent = def.title || doc.Type;
+    const isGeneric =
+      !def.fields ||
+      def.fields.length === 0 ||
+      ['send', 'receive', 'productionCreate', 'productionFinish'].includes(doc.Type);
 
-    docMeta.innerHTML = `
-      <div>ID: <strong>${doc.ID ?? "-"}</strong></div>
-      <div>Тип: <strong>${doc.Type ?? "-"}</strong></div>
-      <div>Создал: <strong>${doc.CreatedBy ?? "-"}</strong></div>
-      <div>Дата: <strong>${doc.CreatedAt ? new Date(doc.CreatedAt).toLocaleString("ru-RU") : "-"}</strong></div>
-    `;
+    docTitle.textContent = def.title || toRuType(doc.Type);
 
-    // собрать форму и заполнить
+    // --- мета-инфа ---
+    let storageText = '-';
+    if (doc.StorageID != null) {
+      try {
+        const s = await fetchStorageOne(doc.StorageID);
+        if (s) {
+          storageText = `${s.Name}${s.Location ? ' — ' + s.Location : ''}`;
+        } else {
+          storageText = `#${doc.StorageID}`;
+        }
+      } catch {
+        storageText = `#${doc.StorageID}`;
+      }
+    }
+
+    const metaParts = [
+      `<div>ID: <strong>${doc.ID ?? "-"}</strong></div>`,
+      `<div>Тип: <strong>${toRuType(doc.Type ?? "-")}</strong></div>`,
+      `<div>Создал: <strong>${doc.CreatedBy ?? "-"}</strong></div>`,
+      `<div>Дата: <strong>${doc.CreatedAt ? new Date(doc.CreatedAt).toLocaleString("ru-RU") : "-"}</strong></div>`,
+      `<div>Склад: <strong>${storageText}</strong></div>`,
+    ];
+
+    if (doc.MovementOrderID != null) {
+      metaParts.push(`<div>Заказ перемещения: <strong>#${doc.MovementOrderID}</strong></div>`);
+    }
+    if (doc.ProductionOrderID != null) {
+      metaParts.push(`<div>Производственный заказ: <strong>#${doc.ProductionOrderID}</strong></div>`);
+    }
+
+    docMeta.innerHTML = metaParts.join("");
+
+    // ====== РЕЖИМ ПРОСТОГО ПРОСМОТРА ДЛЯ send/receive/production* ======
+    if (isGeneric) {
+      const items = Array.isArray(doc.Items) ? doc.Items : [];
+
+      let itemsHTML = "";
+      if (items.length) {
+        itemsHTML = `
+          <div class="mb-3">
+            <label>Позиции</label>
+            <div class="table-wrap">
+              <table class="table table-sm">
+                <thead>
+                  <tr>
+                    <th>ТМЦ</th>
+                    <th>Кол-во</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${items
+                    .map(it => {
+                      const c = it.Component || {};
+                      const name = c.Name || (`#${c.ID ?? ""}`);
+                      return `
+                        <tr>
+                          <td>${escapeHtml(name)}</td>
+                          <td>${it.Quantity ?? 0}</td>
+                        </tr>`;
+                    })
+                    .join("")}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      } else {
+        itemsHTML = `<p class="text-muted">Нет позиций</p>`;
+      }
+
+      const notesHTML = `
+        <div class="mb-3">
+          <label>Заметки</label>
+          <div>${doc.Notes ? escapeHtml(doc.Notes) : '<span class="text-muted">—</span>'}</div>
+        </div>
+      `;
+
+      docForm.innerHTML = itemsHTML + notesHTML;
+
+      // режим просмотра
+      Array.from(docForm.elements).forEach(el => (el.disabled = true));
+      docSubmit.classList.add("hidden");
+      openDocModal();
+      return;
+    }
+
+    // ====== СТАРЫЙ ПУТЬ ДЛЯ buy/sale (со схемой) ======
     const inner = (def.fields || []).map(renderField).join("");
     docForm.innerHTML = inner;
 
-    const item = Array.isArray(doc.Items) ? doc.Items[0] : null;
+    const firstItem = Array.isArray(doc.Items) ? doc.Items[0] : null;
 
     // наполнить селекты
     for (const f of def.fields || []) {
@@ -475,21 +571,21 @@ export async function openDocView(id) {
       }
     }
 
-    // проставить значения (если есть)
+    // проставить значения
     for (const f of def.fields || []) {
       const el = docForm.querySelector(`#fld-${f.name}`);
       if (!el) continue;
-      if (f.name === "storageId")      el.value = String(doc.StorageID ?? "");
-      if (f.name === "fromStorageId")  el.value = String(doc.FromStorageID ?? "");
-      if (f.name === "toStorageId")    el.value = String(doc.ToStorageID ?? "");
-      if (f.name === "componentId")    el.value = String(item?.Component?.ID ?? "");
-      if (f.name === "recipeId")       el.value = String(doc.RecipeID ?? "");
-      if (f.name === "quantity")       el.value = String(item?.Quantity ?? doc.Quantity ?? 0);
-      if (f.name === "notes")          el.value = String(doc.Notes ?? "");
+      if (f.name === "storageId")     el.value = String(doc.StorageID ?? "");
+      if (f.name === "fromStorageId") el.value = String(doc.FromStorageID ?? "");
+      if (f.name === "toStorageId")   el.value = String(doc.ToStorageID ?? "");
+      if (f.name === "componentId")   el.value = String(firstItem?.Component?.ID ?? "");
+      if (f.name === "recipeId")      el.value = String(doc.RecipeID ?? "");
+      if (f.name === "quantity")      el.value = String(firstItem?.Quantity ?? doc.Quantity ?? 0);
+      if (f.name === "notes")         el.value = String(doc.Notes ?? "");
     }
 
     // режим просмотра
-    Array.from(docForm.elements).forEach(el => el.disabled = true);
+    Array.from(docForm.elements).forEach(el => (el.disabled = true));
     docSubmit.classList.add("hidden");
 
     openDocModal();
@@ -497,6 +593,7 @@ export async function openDocView(id) {
     showToast("Не удалось загрузить документ");
   }
 }
+
 
 
 /* =========================

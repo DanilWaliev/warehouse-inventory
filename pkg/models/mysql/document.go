@@ -488,14 +488,21 @@ func (m *DocumentModel) InsertSale(d *models.Document) (*models.Document, error)
 	return d, nil
 }
 
-// InsertProductionCreate — начало производства по нескольким рецептурам.
-// Ожидается, что d.Items содержит ПЛАН ВЫПУСКА: для каждой позиции
-// d.Items[i].Component.ID == Recipe.Result.ID, d.Items[i].Quantity > 0.
-// Создаёт productionorder, пишет его позиции, рассчитывает и списывает
-// ингредиенты со склада #1, затем создаёт документ 'productionCreate'
-// с позициями-ингредиентами.
+// InsertProductionCreate — фиксация начала производства по УЖЕ созданному производственному заказу.
+// Ожидается, что план выпуска уже записан в productionorderitem.
+// Здесь мы:
 //
-// Требуется: d.CreatedBy (обязателен). Все количества — int.
+//  1. по ProductionOrder_ID читаем позиции заказа (Recipe_Component_ID, Quantity),
+//  2. по рецептам считаем суммарную потребность в ингредиентах,
+//  3. списываем ингредиенты со склада №1 (productionStorageID),
+//  4. создаём документ 'productionCreate' с этими списанными ингредиентами.
+//
+// Требуется:
+//   - d != nil
+//   - d.CreatedBy > 0
+//   - d.ProductionOrderID != nil, > 0
+//
+// План из d.Items НЕ используется — он берётся из таблицы productionorderitem.
 func (m *DocumentModel) InsertProductionCreate(d *models.Document) (*models.Document, error) {
 	if d == nil {
 		return nil, errors.New("nil document")
@@ -503,11 +510,13 @@ func (m *DocumentModel) InsertProductionCreate(d *models.Document) (*models.Docu
 	if d.CreatedBy == 0 {
 		return nil, errors.New("CreatedBy is required")
 	}
-	if len(d.Items) == 0 {
-		return nil, errors.New("plan (d.Items) is empty")
+	if d.ProductionOrderID == nil || *d.ProductionOrderID <= 0 {
+		return nil, errors.New("ProductionOrderID is required for productionCreate")
 	}
 
-	// На базе текущего подключения делаем локальную модель рецептур.
+	orderID := *d.ProductionOrderID
+
+	// локальная модель рецептов
 	rm := &RecipeModel{DB: m.DB}
 
 	tx, err := m.DB.Begin()
@@ -516,66 +525,72 @@ func (m *DocumentModel) InsertProductionCreate(d *models.Document) (*models.Docu
 	}
 	defer tx.Rollback()
 
-	// 1) Создаём productionorder (на складе 1)
-	res, err := tx.Exec(`INSERT INTO productionorder (ProductionSite_StorageSite_ID) VALUES (?)`, productionStorageID)
-	if err != nil {
-		return nil, fmt.Errorf("insert productionorder failed: %w", err)
+	// 1) Проверяем, что заказ существует и не закрыт
+	var closed sql.NullTime
+	if err := tx.QueryRow(`
+		SELECT ClosedAt
+		  FROM productionorder
+		 WHERE ProductionOrder_ID = ? AND ProductionSite_StorageSite_ID = ?
+	`, orderID, productionStorageID).Scan(&closed); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, models.ErrNoRecord
+		}
+		return nil, err
 	}
-	orderID64, err := res.LastInsertId()
+	if closed.Valid {
+		return nil, fmt.Errorf("production order %d already closed", orderID)
+	}
+
+	// 2) Читаем позиции заказа (план выпуска)
+	rows, err := tx.Query(`
+		SELECT Recipe_Component_ID, Quantity
+		  FROM productionorderitem
+		 WHERE ProductionOrder_ID = ?
+	`, orderID)
 	if err != nil {
 		return nil, err
 	}
-	orderID := int(orderID64)
+	defer rows.Close()
 
-	// 2) Записываем позиции productionorderitem по плану выпуска из d.Items
-	//    (каждый item — это результат рецептуры и его количество).
-	for _, it := range d.Items {
-		resultID := it.Component.ID
-		qty := it.Quantity
-		if resultID <= 0 || qty <= 0 {
-			return nil, errors.New("invalid plan item (resultID or quantity)")
-		}
-		if _, err := tx.Exec(`
-			INSERT INTO productionorderitem (ProductionOrder_ID, Recipe_Component_ID, Quantity)
-			VALUES (?, ?, ?)
-		`, orderID, resultID, qty); err != nil {
-			return nil, fmt.Errorf("insert productionorderitem failed: %w", err)
-		}
-	}
-
-	// 3) Считаем суммарную потребность в ингредиентах по всем рецептурам из плана
+	// собираем потребность в ингредиентах
 	need := make(map[int]int) // IngredientID -> total required qty
-	for _, it := range d.Items {
-		resultID := it.Component.ID
-		qtyPlan := it.Quantity
-		if resultID <= 0 || qtyPlan <= 0 {
-			return nil, errors.New("invalid plan item (resultID or quantity)")
+
+	for rows.Next() {
+		var recipeResultID, qtyPlan int
+		if err := rows.Scan(&recipeResultID, &qtyPlan); err != nil {
+			return nil, err
+		}
+		if recipeResultID <= 0 || qtyPlan <= 0 {
+			return nil, fmt.Errorf("invalid production order item: recipeResultID=%d qty=%d", recipeResultID, qtyPlan)
 		}
 
-		// Тянем рецептуру (resultID = Recipe.Result.ID)
-		recipe, err := rm.SelectByID(resultID)
+		// тянем рецептуру по Result.ID (он же Recipe_Component_ID)
+		recipe, err := rm.SelectByID(recipeResultID)
 		if err != nil {
-			return nil, fmt.Errorf("select recipe %d failed: %w", resultID, err)
+			return nil, fmt.Errorf("select recipe %d failed: %w", recipeResultID, err)
 		}
 		if recipe == nil || len(recipe.Items) == 0 {
-			return nil, fmt.Errorf("recipe %d has no items", resultID)
+			return nil, fmt.Errorf("recipe %d has no items", recipeResultID)
 		}
 
-		// Суммируем ингредиенты: требуемое = qtyPlan * ingredient.Quantity
+		// суммируем ингредиенты
 		for _, ri := range recipe.Items {
 			ingID := ri.Ingredient.ID
 			ingQty := ri.Quantity
 			if ingID <= 0 || ingQty <= 0 {
-				return nil, fmt.Errorf("invalid recipe item for recipe %d", resultID)
+				return nil, fmt.Errorf("invalid recipe item for recipe %d", recipeResultID)
 			}
 			need[ingID] += ingQty * qtyPlan
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	if len(need) == 0 {
-		return nil, errors.New("aggregated ingredients are empty")
+		return nil, fmt.Errorf("production order %d has no items to create", orderID)
 	}
 
-	// 4) Жёсткое списание ингредиентов со склада 1 под транзакционной блокировкой
+	// 3) Жёсткое списание ингредиентов со склада #1
 	for compID, req := range need {
 		if req <= 0 {
 			continue
@@ -614,13 +629,22 @@ func (m *DocumentModel) InsertProductionCreate(d *models.Document) (*models.Docu
 		}
 	}
 
-	// 5) Документ 'productionCreate' (StorageSite_ID = NULL, ProductionOrder_ID = orderID)
-	docID, err := m.insertDocumentHeaderTx(tx, "productionCreate", d.CreatedBy, d.Notes, nil, &orderID, nil)
+	// 4) Документ 'productionCreate' — жёстко на складе 1,
+	//    с ссылкой на существующий ProductionOrder_ID
+	storageID := productionStorageID
+	docID, err := m.insertDocumentHeaderTx(tx,
+		"productionCreate",
+		d.CreatedBy,
+		d.Notes,
+		nil,        // MovementOrder_Order_ID
+		&orderID,   // ProductionOrder_ID
+		&storageID, // StorageSite_ID
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	// 6) Позиции документа — СПИСАННЫЕ ингредиенты (а не план выпуска!)
+	// 5) Позиции документа — списанные ингредиенты
 	docItems := make([]models.DocumentItem, 0, len(need))
 	for compID, q := range need {
 		if q <= 0 {
@@ -639,18 +663,21 @@ func (m *DocumentModel) InsertProductionCreate(d *models.Document) (*models.Docu
 		return nil, err
 	}
 
-	// Заполняем возвращаемый документ фактическими данными
+	// Заполняем возвращаемый документ
 	d.ID = docID
 	d.Type = "productionCreate"
 	d.ProductionOrderID = &orderID
-	d.Items = docItems // здесь — уже ингредиенты, списанные со склада
+	d.StorageID = &storageID
+	d.Items = docItems
+
 	return d, nil
 }
 
 // InsertProductionFinish — завершение производства:
-// 1) начисляет готовые изделия на склад 1 (по productionorderitem),
+// 1) начисляет готовые изделия на склад #1 (по productionorderitem),
 // 2) закрывает заказ,
 // 3) пишет документ 'productionFinish' с позициями-результатами.
+//
 // Требуется: d.ProductionOrderID != nil, d.CreatedBy
 func (m *DocumentModel) InsertProductionFinish(d *models.Document) (*models.Document, error) {
 	if d == nil {
@@ -671,8 +698,10 @@ func (m *DocumentModel) InsertProductionFinish(d *models.Document) (*models.Docu
 	// 1) Проверка заказа (не закрыт?)
 	var closed sql.NullTime
 	if err := tx.QueryRow(`
-		SELECT ClosedAt FROM productionorder WHERE ProductionOrder_ID = ?
-	`, orderID).Scan(&closed); err != nil {
+		SELECT ClosedAt
+		  FROM productionorder
+		 WHERE ProductionOrder_ID = ? AND ProductionSite_StorageSite_ID = ?
+	`, orderID, productionStorageID).Scan(&closed); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, models.ErrNoRecord
 		}
@@ -682,7 +711,7 @@ func (m *DocumentModel) InsertProductionFinish(d *models.Document) (*models.Docu
 		return nil, fmt.Errorf("production order %d already closed", orderID)
 	}
 
-	// 2) Позиции заказа = результаты
+	// 2) Позиции заказа = результаты (что хотим выпустить)
 	rows, err := tx.Query(`
 		SELECT Recipe_Component_ID, Quantity
 		  FROM productionorderitem
@@ -711,7 +740,7 @@ func (m *DocumentModel) InsertProductionFinish(d *models.Document) (*models.Docu
 		return nil, errors.New("production order has no items to finish")
 	}
 
-	// 3) Начислить готовые изделия на склад 1
+	// 3) Начислить готовые изделия на склад #1
 	for _, o := range outs {
 		if _, err := tx.Exec(`
 			INSERT INTO inventory (Component_ID, StorageSite_ID, Quantity)
@@ -724,14 +753,23 @@ func (m *DocumentModel) InsertProductionFinish(d *models.Document) (*models.Docu
 
 	// 4) Закрыть заказ
 	if _, err := tx.Exec(`
-		UPDATE productionorder SET ClosedAt = CURRENT_TIMESTAMP
+		UPDATE productionorder
+		   SET ClosedAt = CURRENT_TIMESTAMP
 		 WHERE ProductionOrder_ID = ?
 	`, orderID); err != nil {
 		return nil, fmt.Errorf("close production order failed: %w", err)
 	}
 
-	// 5) Документ 'productionFinish'
-	docID, err := m.insertDocumentHeaderTx(tx, "productionFinish", d.CreatedBy, d.Notes, nil, &orderID, nil)
+	// 5) Документ 'productionFinish' — тоже склад #1
+	storageID := productionStorageID
+	docID, err := m.insertDocumentHeaderTx(tx,
+		"productionFinish",
+		d.CreatedBy,
+		d.Notes,
+		nil,        // MovementOrder_Order_ID
+		&orderID,   // ProductionOrder_ID
+		&storageID, // StorageSite_ID
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -754,7 +792,9 @@ func (m *DocumentModel) InsertProductionFinish(d *models.Document) (*models.Docu
 
 	d.ID = docID
 	d.Type = "productionFinish"
+	d.StorageID = &storageID
 	d.Items = docItems
+
 	return d, nil
 }
 

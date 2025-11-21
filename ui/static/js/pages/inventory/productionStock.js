@@ -1,6 +1,14 @@
 // /static/js/pages/inventory/productionStock.js
+import { openDocList } from "../../docs.js";
+
 export function initProductionStock({ showToast }) {
   const tableBody = document.getElementById('table-stock-production-body');
+
+  // топбар, чтобы прилепить кнопку "Документы"
+  const controlPanel = document.getElementById("control-panel");
+  const panelRight   = controlPanel?.querySelector(".flex");
+
+  let btnDocs = null;
 
   async function load() {
     if (!tableBody) return;
@@ -24,7 +32,7 @@ export function initProductionStock({ showToast }) {
         return;
       }
 
-      // Колонки в шаблоне: ТМЦ | Количество | Вес (кг) | Заказ | Действия
+      // Колонки: ТМЦ | Количество | Вес (кг) | Заказ | Действия
       for (const it of inventory) {
         const tr = document.createElement('tr');
 
@@ -53,9 +61,33 @@ export function initProductionStock({ showToast }) {
     }
   }
 
+  function handleDocsClick() {
+    // склад производства у тебя жёстко = 1
+    openDocList({ storageId: 1 });
+  }
+
   // Для совместимости с остальной архитектурой
-  function showControls() { /* без дополнительных контролов */ }
-  function hideControls() { /* без дополнительных контролов */ }
+  function showControls() {
+    if (!controlPanel || !panelRight) return;
+
+    if (!btnDocs) {
+      btnDocs = document.createElement("button");
+      btnDocs.className = "btn";
+      btnDocs.textContent = "Документы";
+      btnDocs.addEventListener("click", handleDocsClick);
+      panelRight.appendChild(btnDocs);
+    }
+
+    load();
+  }
+
+  function hideControls() {
+    if (btnDocs) {
+      btnDocs.removeEventListener("click", handleDocsClick);
+      btnDocs.remove();
+      btnDocs = null;
+    }
+  }
 
   return { showControls, hideControls, load };
 }

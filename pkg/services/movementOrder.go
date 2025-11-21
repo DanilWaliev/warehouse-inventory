@@ -134,6 +134,12 @@ func (s *MovementOrderService) UpdateBatchStatus(batchId int, orderId int, newSt
 		if err != nil {
 			return err
 		}
+		route, err := s.routeModel.SelectByID(mo.Route.ID)
+		if err != nil {
+			return err
+		}
+		mo.Route = *route
+
 		doc := &models.Document{
 			Type:            "receive",
 			MovementOrderID: &mo.ID,

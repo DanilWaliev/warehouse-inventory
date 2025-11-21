@@ -18,7 +18,7 @@ func NewServices(models *mysql.MySQLModels) *Services {
 		UserService:            NewUserService(models.UserModel),
 		ComponentService:       NewComponentService(models.ComponentModel),
 		RecipeService:          NewRecipeService(models.RecipeModel, models.ComponentModel),
-		ProductionOrderService: NewOrderService(models.ProductionOrderModel, models.RecipeModel),
+		ProductionOrderService: NewOrderService(models.ProductionOrderModel, models.RecipeModel, models.DocumentModel),
 		StorageService:         NewStorageService(models.StorageModel),
 		DocumentService:        NewDocumentService(models.DocumentModel),
 		RouteService:           NewRouteService(models.RouteModel, models.StorageModel),

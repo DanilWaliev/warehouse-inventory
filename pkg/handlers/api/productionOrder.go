@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"warehouse-inventory/pkg/handlers"
+	"warehouse-inventory/pkg/handlers/auth"
 	"warehouse-inventory/pkg/models"
 	"warehouse-inventory/pkg/services"
 	"warehouse-inventory/pkg/sqlerr"
@@ -100,8 +101,11 @@ func (h *OrderHandler) Post(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	// Получаем данные об отправителе
+	senderUser := r.Context().Value(auth.UserContextKey).(*auth.AuthorizedUser)
+
 	// Сохраняем в БД
-	err := h.OrderService.Create(o)
+	err := h.OrderService.Create(o, senderUser.ID)
 	if err != nil {
 		if sqlerr.Is(err, sqlerr.ErrDuplicateEntry) {
 			h.Helper.ClientError(w, http.StatusConflict)
@@ -129,6 +133,9 @@ func (h *OrderHandler) Put(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Получаем данные об отправителе
+	senderUser := r.Context().Value(auth.UserContextKey).(*auth.AuthorizedUser)
+
 	// Проверка минимальных условий
 	if input.ID == 0 {
 		h.Helper.ClientError(w, http.StatusBadRequest)
@@ -136,7 +143,7 @@ func (h *OrderHandler) Put(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Сохраняем в БД
-	err := h.OrderService.Update(input.ID)
+	err := h.OrderService.Update(input.ID, senderUser.ID)
 	if err != nil {
 		if sqlerr.Is(err, sqlerr.ErrDuplicateEntry) {
 			h.Helper.ClientError(w, http.StatusConflict)
