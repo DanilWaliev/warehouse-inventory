@@ -5,6 +5,7 @@ import (
 	"time"
 	"warehouse-inventory/pkg/handlers"
 	"warehouse-inventory/pkg/hash"
+	"warehouse-inventory/pkg/models"
 	"warehouse-inventory/pkg/services"
 )
 
@@ -47,6 +48,20 @@ func (h *AuthHandler) SignIn(w http.ResponseWriter, r *http.Request) {
 			Email   string
 		}{
 			Message: "Аккаунт не найден или неверный пароль",
+			Email:   email,
+		}
+
+		h.renderer.Render(w, "signin.page.tmpl", templateData)
+		return
+	}
+
+	if !user.IsActive {
+		// Создаем структуру для отправки сообщения об ошибке и сохранения email
+		templateData := struct {
+			Message string
+			Email   string
+		}{
+			Message: "Аккаунт не активен",
 			Email:   email,
 		}
 
@@ -101,7 +116,7 @@ func (h *AuthHandler) SignUp(w http.ResponseWriter, r *http.Request) {
 
 		h.renderer.Render(w, "signup.page.tmpl", templateData)
 		return
-	} else if err != nil {
+	} else if err != nil && err != models.ErrNoRecord {
 		h.helper.ServerError(w, err)
 		return
 	}

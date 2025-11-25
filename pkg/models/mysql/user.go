@@ -20,14 +20,14 @@ func NewUserModel(db *sql.DB) *UserModel {
 }
 
 func (m *UserModel) GetByEmail(email string) (*models.User, error) {
-	stmt := `SELECT User_ID, Email, PasswordHash, FullName, Role, Phone, CreatedAt FROM user
+	stmt := `SELECT User_ID, Email, PasswordHash, FullName, Role, Phone, CreatedAt, IsActive FROM user
 	WHERE Email = ?`
 
 	row := m.DB.QueryRow(stmt, email)
 
 	u := &models.User{}
 
-	err := row.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.FullName, &u.Role, &u.Phone, &u.CreatedAt)
+	err := row.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.FullName, &u.Role, &u.Phone, &u.CreatedAt, &u.IsActive)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, models.ErrNoRecord
@@ -53,6 +53,90 @@ func (m *UserModel) ExistsByEmail(email string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func (m *UserModel) SelectByID(id int) (*models.User, error) {
+	stmt := `SELECT User_ID, Email, PasswordHash, FullName, Role, Phone, CreatedAt, IsActive FROM user
+	where User_ID = ?`
+
+	row := m.DB.QueryRow(stmt, id)
+	u := &models.User{}
+
+	err := row.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.FullName, &u.Role, &u.Phone, &u.CreatedAt, &u.IsActive)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, models.ErrNoRecord
+		} else {
+			return nil, err
+		}
+	}
+
+	return u, nil
+}
+
+func (m *UserModel) SelectAll() ([]*models.User, error) {
+	stmt := `SELECT * From user`
+
+	rows, err := m.DB.Query(stmt)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	var users []*models.User
+
+	for rows.Next() {
+		u := &models.User{}
+
+		err := rows.Scan(&u.ID, &u.PasswordHash, &u.FullName, &u.Role, &u.Email, &u.Phone, &u.CreatedAt, &u.IsActive)
+
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, models.ErrNoRecord
+			} else {
+				return nil, err
+			}
+		}
+
+		users = append(users, u)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return users, nil
+}
+
+func (m *UserModel) SetActive(id int) error {
+	stmt := `UPDATE user SET IsActive = 1 WHERE User_ID = ?`
+
+	_, err := m.DB.Exec(stmt, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return models.ErrNoRecord
+		} else {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *UserModel) SetInactive(id int) error {
+	stmt := `UPDATE user SET IsActive = 0 WHERE User_ID = ?`
+
+	_, err := m.DB.Exec(stmt, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return models.ErrNoRecord
+		} else {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (m *UserModel) Insert(fullname, phone, email, passwordHash, role string) error {

@@ -42,3 +42,30 @@ func (s *UserService) AddUser(fullname, phone, email, password, role string) err
 	s.userModel.Insert(fullname, phone, email, passwordHash, role)
 	return nil
 }
+
+func (s *UserService) SetActive(id int) error {
+	return s.userModel.SetActive(id)
+}
+
+func (s *UserService) SetInactive(id int) error {
+	return s.userModel.SetInactive(id)
+}
+
+func (s *UserService) ReadByIDs(ids []int) ([]*models.User, error) {
+	var users []*models.User
+
+	for _, id := range ids {
+		user, err := s.userModel.SelectByID(id)
+		if err != nil {
+			return nil, err
+		}
+
+		users = append(users, user)
+	}
+
+	return users, nil
+}
+
+func (s *UserService) ReadAll() ([]*models.User, error) {
+	return s.userModel.SelectAll()
+}

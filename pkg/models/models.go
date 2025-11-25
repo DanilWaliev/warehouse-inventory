@@ -26,6 +26,7 @@ type User struct {
 	Email        string
 	Phone        string
 	CreatedAt    time.Time
+	IsActive     bool
 }
 
 type Recipe struct {
