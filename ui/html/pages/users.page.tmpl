@@ -1,0 +1,121 @@
+{{template "base" .}}
+
+{{define "title"}}Пользователи{{end}}
+
+{{ define "main" }}
+<main>
+  <div class="page" id="page-root">
+
+    <!-- Основной контент -->
+    <section class="content">
+
+      <!-- Верхняя панель -->
+      <div class="topbar" id="control-panel">
+        <h2 id="section-title">Пользователи</h2>
+        <div class="flex gap-2 items-center">
+          <!-- сюда можно добавить фильтры/поиск, если понадобится -->
+        </div>
+      </div>
+
+      <!-- Карточка со вкладками пользователей -->
+      <div class="card user-list-card">
+        <!-- Вкладки: активные / неактивные -->
+        <div class="tabs" id="user-tabs">
+          <button
+            type="button"
+            class="tab-button active"
+            data-tab="active-users"
+          >
+            Активные пользователи
+          </button>
+          <button
+            type="button"
+            class="tab-button"
+            data-tab="inactive-users"
+          >
+            Неактивные пользователи
+          </button>
+        </div>
+
+        <!-- Контент вкладок -->
+        <div class="tabs-content">
+          <!-- Активные пользователи -->
+          <div
+            class="tab-panel"
+            id="tab-active-users"
+            data-tab-panel="active-users"
+          >
+            <div class="user-list-grid" id="active-users-list">
+              <!-- Карточки активных пользователей будут добавляться сюда через JS -->
+            </div>
+          </div>
+
+          <!-- Неактивные пользователи -->
+          <div
+            class="tab-panel hidden"
+            id="tab-inactive-users"
+            data-tab-panel="inactive-users"
+          >
+            <div class="user-list-grid" id="inactive-users-list">
+              <!-- Карточки неактивных пользователей будут добавляться сюда через JS -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Шаблон карточки пользователя для JS -->
+      <template id="user-card-template">
+        <article class="user-card" data-user-id="">
+          <div class="user-card-body">
+            <h3 class="user-fullname">
+              <!-- Fullname -->
+            </h3>
+
+            <dl class="user-meta">
+              <div class="user-meta-row">
+                <dt>Роль</dt>
+                <dd class="user-role">
+                  <!-- Role -->
+                </dd>
+              </div>
+              <div class="user-meta-row">
+                <dt>Телефон</dt>
+                <dd class="user-phone">
+                  <!-- Phone -->
+                </dd>
+              </div>
+              <div class="user-meta-row">
+                <dt>Email</dt>
+                <dd class="user-email">
+                  <!-- Email -->
+                </dd>
+              </div>
+              <div class="user-meta-row">
+                <dt>Создан</dt>
+                <dd class="user-created-at">
+                  <!-- CreatedAt -->
+                </dd>
+              </div>
+            </dl>
+          </div>
+
+          <div class="user-card-footer">
+            <!-- Одна кнопка, текст которой заполняется в JS в зависимости от статуса -->
+            <button
+              type="button"
+              class="btn btn-primary user-toggle-status"
+              data-action=""
+            >
+              <!-- "Активировать" или "Заморозить" -->
+            </button>
+          </div>
+        </article>
+      </template>
+
+    </section>
+  </div>
+
+</main>
+
+<script type="module" src="/static/js/pages/users/main.js"></script>
+{{ end }}

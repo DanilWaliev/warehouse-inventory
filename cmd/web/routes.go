@@ -14,6 +14,7 @@ func (app *application) routes() *http.ServeMux {
 	mux.HandleFunc("/production", app.authHandler.AccessWithRoles(app.pageHandler.Production, "admin", "prod_manager"))
 	mux.HandleFunc("/movement", app.authHandler.AccessWithRoles(app.pageHandler.Movement, "admin", "logistics"))
 	mux.HandleFunc("/inventory", app.authHandler.AccessWithRoles(app.pageHandler.Inventory, "admin", "storekeeper"))
+	mux.HandleFunc("/users", app.authHandler.AccessWithRoles(app.pageHandler.Users, "admin"))
 
 	// Запросы к API
 	mux.HandleFunc("/api/tmc", app.authHandler.AccessWithRoles(app.apiHandler.Component, "admin", "prod_manager"))

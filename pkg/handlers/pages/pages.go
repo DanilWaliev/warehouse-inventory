@@ -37,3 +37,7 @@ func (h *PageHandler) Movement(w http.ResponseWriter, r *http.Request) {
 func (h *PageHandler) Inventory(w http.ResponseWriter, r *http.Request) {
 	h.Renderer.Render(w, "inventory.page.tmpl", nil)
 }
+
+func (h *PageHandler) Users(w http.ResponseWriter, r *http.Request) {
+	h.Renderer.Render(w, "users.page.tmpl", nil)
+}
