@@ -13,6 +13,7 @@
 @import 'pages/production.css';
 @import 'pages/inventory.css';
 @import 'pages/movement.css';
+@import 'pages/users.css';
 
 /* Импорт стилей для отдельных компонентов страницы */
 @import 'components/header.css';

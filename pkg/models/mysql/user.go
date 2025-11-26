@@ -74,6 +74,47 @@ func (m *UserModel) SelectByID(id int) (*models.User, error) {
 	return u, nil
 }
 
+func (m *UserModel) SelectByStatus(active bool) ([]*models.User, error) {
+	stmt := `SELECT User_ID, Email, PasswordHash, FullName, Role, Phone, CreatedAt, IsActive FROM user
+	WHERE IsActive = ?`
+
+	isActiveFlag := 0
+	if active {
+		isActiveFlag = 1
+	}
+
+	rows, err := m.DB.Query(stmt, isActiveFlag)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	var users []*models.User
+
+	for rows.Next() {
+		u := &models.User{}
+
+		err := rows.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.FullName, &u.Role, &u.Phone, &u.CreatedAt, &u.IsActive)
+
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, models.ErrNoRecord
+			} else {
+				return nil, err
+			}
+		}
+
+		users = append(users, u)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return users, nil
+}
+
 func (m *UserModel) SelectAll() ([]*models.User, error) {
 	stmt := `SELECT * From user`
 

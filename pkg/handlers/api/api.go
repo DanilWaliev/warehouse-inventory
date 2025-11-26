@@ -60,12 +60,12 @@ func (h *APIHandler) Component(w http.ResponseWriter, r *http.Request) {
 func (h *APIHandler) User(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		//
+		h.UserHandler.Get(w, r)
 	case http.MethodPost:
-		//
+
 	case http.MethodPut:
-		//
 	case http.MethodDelete:
+		h.UserHandler.Put(w, r)
 	//
 	default:
 		w.Header().Set("Allow", strings.Join([]string{

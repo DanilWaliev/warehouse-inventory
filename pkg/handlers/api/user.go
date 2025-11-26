@@ -32,6 +32,23 @@ func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 		ids = append(ids, id)
 	}
 
+	statusStr := r.URL.Query().Get("status")
+
+	if statusStr != "" && len(ids) > 0 {
+		h.Helper.ClientError(w, http.StatusBadRequest)
+		return
+	}
+
+	if statusStr != "active" && statusStr != "inactive" {
+		h.Helper.ClientError(w, http.StatusBadRequest)
+		return
+	}
+
+	status := false
+	if statusStr == "active" {
+		status = true
+	}
+
 	var (
 		users []*models.User
 		err   error
@@ -40,6 +57,8 @@ func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case len(ids) > 0:
 		users, err = h.UserService.ReadByIDs(ids)
+	case statusStr != "":
+		users, err = h.UserService.ReadByStatus(status)
 	default:
 		users, err = h.UserService.ReadAll()
 	}
@@ -58,4 +77,30 @@ func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 		h.Helper.ServerError(w, err)
 		return
 	}
+}
+
+func (h *UserHandler) Put(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.URL.Query().Get("id"))
+	if err != nil {
+		h.Helper.ClientError(w, http.StatusBadRequest)
+		return
+	}
+
+	statusStr := r.URL.Query().Get("status")
+	if (statusStr != "active") && (statusStr != "inactive") {
+		h.Helper.ClientError(w, http.StatusBadRequest)
+		return
+	}
+
+	if statusStr == "active" {
+		err = h.UserService.SetActive(id)
+	} else {
+		err = h.UserService.SetInactive(id)
+	}
+	if err != nil {
+		h.Helper.ServerError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }

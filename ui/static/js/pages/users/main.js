@@ -18,10 +18,9 @@ import { showConfirm } from "../../confirm.js";
     return;
   }
 
-  // текущая вкладка: "active-users" | "inactive-users"
+  // текущая вкладка
   let activeTab = "active-users";
 
-  // проста́я кеш-структура (если захочешь, можно будет отключить кеширование)
   const cache = {
     "active-users": null,
     "inactive-users": null,
@@ -32,7 +31,7 @@ import { showConfirm } from "../../confirm.js";
     "inactive-users": inactiveList,
   };
 
-  // --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
+  // ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====
 
   function formatCreatedAt(value) {
     if (!value) return "";
@@ -67,18 +66,19 @@ import { showConfirm } from "../../confirm.js";
   }
 
   function normalizeId(user) {
-    // TODO: если ID у пользователя называется по-другому — поменяй здесь.
+    // Подстрой под свои поля ID, если нужно
     return (
       user.ID ||
       user.Id ||
       user.UserID ||
       user.UserId ||
-      user.Email || // крайний вариант — email
+      user.Email || // крайний запасной вариант
       null
     );
   }
 
-  // отрисовка списка пользователей во вкладке
+  // ===== РЕНДЕР СПИСКА ПОЛЬЗОВАТЕЛЕЙ =====
+
   function renderUsers(tabKey, users) {
     const listElem = listByTab[tabKey];
     if (!listElem) return;
@@ -92,6 +92,8 @@ import { showConfirm } from "../../confirm.js";
       );
       return;
     }
+
+    const isActiveTab = tabKey === "active-users";
 
     users.forEach((user) => {
       const clone = /** @type {HTMLElement} */ (
@@ -108,18 +110,22 @@ import { showConfirm } from "../../confirm.js";
       const phoneEl = clone.querySelector(".user-phone");
       const emailEl = clone.querySelector(".user-email");
       const createdEl = clone.querySelector(".user-created-at");
-      const toggleBtn = /** @type {HTMLButtonElement | null} */ (
-        clone.querySelector(".user-toggle-status")
-      );
+      const footer = clone.querySelector(".user-card-footer");
 
-      if (fullNameEl) fullNameEl.textContent = user.Fullname || "";
+      if (fullNameEl) fullNameEl.textContent = user.FullName || "";
       if (roleEl) roleEl.textContent = user.Role || "";
       if (phoneEl) phoneEl.textContent = user.Phone || "";
       if (emailEl) emailEl.textContent = user.Email || "";
       if (createdEl) createdEl.textContent = formatCreatedAt(user.CreatedAt);
 
-      if (toggleBtn) {
-        const isActiveTab = tabKey === "active-users";
+      if (footer) {
+        // Чистим футер, чтобы управлять кнопками сами
+        footer.innerHTML = "";
+
+        // Кнопка смены статуса
+        const toggleBtn = document.createElement("button");
+        toggleBtn.type = "button";
+        toggleBtn.className = "btn btn-primary user-toggle-status";
         toggleBtn.textContent = isActiveTab ? "Заморозить" : "Активировать";
         toggleBtn.dataset.action = isActiveTab ? "freeze" : "activate";
 
@@ -127,18 +133,34 @@ import { showConfirm } from "../../confirm.js";
           handleToggleStatus({
             user,
             currentTab: tabKey,
-            cardElem: clone,
           });
         });
+
+        footer.appendChild(toggleBtn);
+
+        // На замороженных добавляем ещё кнопку "Удалить"
+        if (!isActiveTab) {
+          const deleteBtn = document.createElement("button");
+          deleteBtn.type = "button";
+          deleteBtn.className = "btn btn-danger user-delete";
+          deleteBtn.textContent = "Удалить";
+          deleteBtn.style.marginLeft = "0.5rem";
+
+          deleteBtn.addEventListener("click", () => {
+            handleDeleteUser({ user });
+          });
+
+          footer.appendChild(deleteBtn);
+        }
       }
 
       listElem.appendChild(clone);
     });
   }
 
-  // загрузка пользователей для вкладки
+  // ===== ЗАГРУЗКА ДАННЫХ ДЛЯ ВКЛАДКИ =====
+
   async function loadTab(tabKey, { force = false } = {}) {
-    // есть валидный кеш и не просили обновить — используем его
     if (!force && Array.isArray(cache[tabKey])) {
       renderUsers(tabKey, cache[tabKey]);
       return;
@@ -150,14 +172,17 @@ import { showConfirm } from "../../confirm.js";
     renderEmptyState(listElem, "Загрузка...");
 
     try {
-      // TODO: подставь реальные URL и параметры фильтра под свой API
-      // Пример: /api/users?status=active | /api/users?status=inactive
       const statusParam = tabKey === "active-users" ? "active" : "inactive";
-      const res = await fetch(`/api/users?status=${encodeURIComponent(statusParam)}`);
+      const res = await fetch(`/api/user?status=${encodeURIComponent(statusParam)}`);
 
       if (!res.ok) {
-        renderEmptyState(listElem, "Ошибка загрузки пользователей");
-        showToast("Ошибка загрузки пользователей");
+        if (res.status != 404) {
+          renderEmptyState(listElem, "Ошибка загрузки пользователей");
+          showToast("Ошибка загрузки пользователей");
+        } else {
+          renderEmptyState(listElem, "Нет пользователей");
+        }
+        
         return;
       }
 
@@ -177,7 +202,8 @@ import { showConfirm } from "../../confirm.js";
     }
   }
 
-  // переключение вкладки
+  // ===== ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК =====
+
   function setActiveTab(tabKey) {
     activeTab = tabKey;
 
@@ -190,15 +216,14 @@ import { showConfirm } from "../../confirm.js";
       panel.classList.toggle("hidden", key !== tabKey);
     });
 
-    if (sectionTitle) {
-      sectionTitle.textContent =
-        tabKey === "active-users" ? "Активные пользователи" : "Неактивные пользователи";
-    }
+    sectionTitle.textContent =
+      tabKey === "active-users" ? "Активные пользователи" : "Неактивные пользователи";
 
     loadTab(tabKey);
   }
 
-  // обработчик активации / заморозки
+  // ===== СМЕНА СТАТУСА ПОЛЬЗОВАТЕЛЯ =====
+
   async function handleToggleStatus({ user, currentTab }) {
     const id = normalizeId(user);
     if (!id) {
@@ -208,11 +233,11 @@ import { showConfirm } from "../../confirm.js";
     }
 
     const isActivate = currentTab === "inactive-users";
-    const action = isActivate ? "activate" : "freeze";
+    const action = isActivate ? "active" : "inactive";
 
     const confirmText = isActivate
-      ? `Активировать пользователя «${user.Fullname || ""}»?`
-      : `Заморозить пользователя «${user.Fullname || ""}»?`;
+      ? `Активировать пользователя «${user.FullName || ""}»?`
+      : `Заморозить пользователя «${user.FullName || ""}»?`;
 
     const confirmTitle = isActivate ? "Активировать пользователя" : "Заморозить пользователя";
 
@@ -220,9 +245,9 @@ import { showConfirm } from "../../confirm.js";
     if (!confirmed) return;
 
     try {
-      // TODO: подставь реальные URL/метод под свой API
-      // Пример: PUT /api/users/{id}/activate | /api/users/{id}/freeze
-      const res = await fetch(`/api/users/${encodeURIComponent(id)}/${action}`, {
+      // Эндпоинт смены статуса:
+      // подстрой под свой API, если нужно
+      const res = await fetch(`/api/user?id=${encodeURIComponent(id)}&status=${action}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
       });
@@ -237,7 +262,7 @@ import { showConfirm } from "../../confirm.js";
         "success",
       );
 
-      // После смены статуса перезагружаем обе вкладки, чтобы данные были актуальны
+      // Обновляем обе вкладки
       await Promise.all([
         loadTab("active-users", { force: true }),
         loadTab("inactive-users", { force: true }),
@@ -248,7 +273,48 @@ import { showConfirm } from "../../confirm.js";
     }
   }
 
-  // --- СЛУШАТЕЛИ ---
+  // ===== УДАЛЕНИЕ ПОЛЬЗОВАТЕЛЯ (ТОЛЬКО ДЛЯ ЗАМОРОЖЕННЫХ) =====
+
+  async function handleDeleteUser({ user }) {
+    const id = normalizeId(user);
+    if (!id) {
+      console.error("users/main.js: не удалось определить ID пользователя для удаления", user);
+      showToast("Не удалось определить пользователя");
+      return;
+    }
+
+    const confirmed = await showConfirm(
+      `Удалить пользователя «${user.FullName || ""}» без возможности восстановления?`,
+      "Удалить пользователя",
+    );
+    if (!confirmed) return;
+
+    try {
+      // Эндпоинт удаления.
+      // Если у тебя стиль как у TMC (`/api/user?id=...`), замени на свой вариант.
+      const res = await fetch(`/api/user/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        showToast("Не удалось удалить пользователя");
+        return;
+      }
+
+      showToast("Пользователь удалён", "success");
+
+      // Обновляем обе вкладки
+      await Promise.all([
+        loadTab("active-users", { force: true }),
+        loadTab("inactive-users", { force: true }),
+      ]);
+    } catch (err) {
+      console.error(err);
+      showToast("Ошибка сети при удалении пользователя");
+    }
+  }
+
+  // ===== СЛУШАТЕЛИ =====
 
   tabs.forEach((btn) => {
     const tabKey = btn.dataset.tab;
@@ -260,11 +326,10 @@ import { showConfirm } from "../../confirm.js";
     });
   });
 
-  // позиционирование хедера, как в примере с inventory
   window.addEventListener("resize", updateHeaderOffset);
   window.addEventListener("load", updateHeaderOffset);
   updateHeaderOffset();
 
-  // --- СТАРТ ---
+  // старт
   setActiveTab(activeTab);
 })();

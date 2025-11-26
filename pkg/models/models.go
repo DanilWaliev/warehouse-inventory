@@ -19,7 +19,6 @@ type Component struct {
 
 type User struct {
 	ID           int
-	Username     string
 	PasswordHash string
 	FullName     string
 	Role         string
