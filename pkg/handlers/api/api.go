@@ -64,8 +64,8 @@ func (h *APIHandler) User(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 
 	case http.MethodPut:
-	case http.MethodDelete:
 		h.UserHandler.Put(w, r)
+	case http.MethodDelete:
 	//
 	default:
 		w.Header().Set("Allow", strings.Join([]string{

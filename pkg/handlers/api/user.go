@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"warehouse-inventory/pkg/handlers"
@@ -22,6 +23,7 @@ func NewUserHandler(helper *handlers.LogHelper, userService *services.UserServic
 }
 
 func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
+	// Собираем id-шники (может быть несколько ?id=1&id=2)
 	var ids []int
 	for _, idStr := range r.URL.Query()["id"] {
 		id, err := strconv.Atoi(idStr)
@@ -32,34 +34,57 @@ func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 		ids = append(ids, id)
 	}
 
-	statusStr := r.URL.Query().Get("status")
+	q := r.URL.Query()
 
-	if statusStr != "" && len(ids) > 0 {
+	// Проверяем, передавался ли вообще параметр status
+	statusVals, hasStatus := q["status"]
+
+	// Нельзя одновременно и status, и id
+	if hasStatus && len(ids) > 0 {
 		h.Helper.ClientError(w, http.StatusBadRequest)
 		return
-	}
-
-	if statusStr != "active" && statusStr != "inactive" {
-		h.Helper.ClientError(w, http.StatusBadRequest)
-		return
-	}
-
-	status := false
-	if statusStr == "active" {
-		status = true
 	}
 
 	var (
-		users []*models.User
-		err   error
+		statusStr string
+		status    bool
+		users     []*models.User
+		err       error
 	)
+
+	if hasStatus {
+		// Мы разрешаем только ровно один status
+		if len(statusVals) != 1 {
+			h.Helper.ClientError(w, http.StatusBadRequest)
+			return
+		}
+
+		statusStr = statusVals[0]
+
+		// Запрещаем пустой статус: ?status=
+		if statusStr == "" {
+			h.Helper.ClientError(w, http.StatusBadRequest)
+			return
+		}
+
+		// Разрешаем только active / inactive
+		if statusStr != "active" && statusStr != "inactive" {
+			h.Helper.ClientError(w, http.StatusBadRequest)
+			return
+		}
+
+		status = (statusStr == "active")
+	}
 
 	switch {
 	case len(ids) > 0:
 		users, err = h.UserService.ReadByIDs(ids)
-	case statusStr != "":
+
+	case hasStatus:
 		users, err = h.UserService.ReadByStatus(status)
+
 	default:
+		// status не передан вообще и id нет — отдать всех
 		users, err = h.UserService.ReadAll()
 	}
 
@@ -91,6 +116,8 @@ func (h *UserHandler) Put(w http.ResponseWriter, r *http.Request) {
 		h.Helper.ClientError(w, http.StatusBadRequest)
 		return
 	}
+
+	fmt.Printf("\nstatusStr: %v, id: %v\n", statusStr, id)
 
 	if statusStr == "active" {
 		err = h.UserService.SetActive(id)

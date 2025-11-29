@@ -1,15 +1,8 @@
 /* header.css */
 
-.nav-menu a,
-.nav-menu a:link,
-.nav-menu a:visited,
-.nav-menu a:hover,
-.nav-menu a:active {
-    color: white;
-    text-decoration: none;
-}
-
+/* Общий контейнер хедера */
 .header-container {
+    display: flex;
     justify-content: space-between;
     align-items: center;
     background-color: #000000;
@@ -18,40 +11,139 @@
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+/* ==== ЛЕВАЯ ЧАСТЬ: НАВИГАЦИЯ ==== */
+
 .nav-menu {
-    float: left;
-    align-items: center;
     display: flex;
+    align-items: center;
     height: 100%;
+}
+
+/* Ссылки в навигации */
+.nav-menu a,
+.nav-menu a:link,
+.nav-menu a:visited,
+.nav-menu a:hover,
+.nav-menu a:active {
+    color: #ffffff;
+    text-decoration: none;
 }
 
 .nav-button {
     background: none;
-    color: white;
+    color: #ffffff;
     padding: var(--spacing-3) var(--spacing-4);
     border-radius: var(--border-radius);
     transition: var(--transition);
+    font-size: 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    height: 100%;
 }
 
 .nav-button:hover {
-    background-color: rgba(255, 255, 255, 0.05);
+    background-color: rgba(255, 255, 255, 0.08);
 }
+
+/* ==== ПРАВАЯ ЧАСТЬ: ПОЛЬЗОВАТЕЛЬ + ВЫЙТИ ==== */
 
 .account-section {
-    float: right;
     display: flex;
-    height: 100%;
     align-items: center;
+    gap: 0.75rem;
+    height: 100%;
 }
 
+/* Блок "ФИО + роль" */
+.account-user {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* ФИО пользователя */
+.account-user-name {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #f9fafb;
+    max-width: 220px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Бейджик с ролью */
+.account-role-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem 0.6rem;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.9);
+    background: rgba(148, 163, 184, 0.2);
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: #e5e7eb;
+    white-space: nowrap;
+}
+
+/* Кнопка "Выйти" */
 .account-button {
     background: none;
-    color: white;
+    color: #ffffff;
     padding: var(--spacing-3) var(--spacing-4);
     border-radius: var(--border-radius);
     transition: var(--transition);
+    font-size: 0.9rem;
+    border: 1px solid transparent;
+    display: inline-flex;
+    align-items: center;
+    height: 100%;
 }
 
 .account-button:hover {
-    background-color: rgba(255, 255, 255, 0.05);
+    background-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(148, 163, 184, 0.8);
+}
+
+/* ==== АДАПТИВНОСТЬ ==== */
+
+@media (max-width: 768px) {
+    .header-container {
+        padding: 0 var(--spacing-2);
+    }
+
+    .account-user-name {
+        max-width: 150px;
+    }
+
+    .nav-button {
+        padding: var(--spacing-2) var(--spacing-3);
+    }
+
+    .account-button {
+        padding: var(--spacing-2) var(--spacing-3);
+    }
+}
+
+@media (max-width: 540px) {
+    .header-container {
+        gap: 0.75rem;
+    }
+
+    .nav-menu {
+        font-size: 0.85rem;
+    }
+
+    .account-section {
+        gap: 0.5rem;
+    }
+
+    .account-user-name {
+        max-width: 120px;
+    }
+
+    .account-role-badge {
+        display: none; /* если совсем мало места, роль можно скрыть */
+    }
 }
