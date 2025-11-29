@@ -107,11 +107,9 @@ export function initRoutes({ showToast, showConfirm }) {
           <td>${r.Transit?.Name || ''}</td>
           <td>${r.Edh ?? ''}</td>
           <td>
-            <button class="btn-edit" data-id="${r.ID}">Изм.</button>
             <button class="btn-delete" data-id="${r.ID}">Удалить</button>
           </td>
         `;
-        tr.querySelector('.btn-edit')?.addEventListener('click', () => openEdit(r.ID));
         tr.querySelector('.btn-delete')?.addEventListener('click', async () => {
           if (!(await showConfirm?.('Удалить маршрут?', 'Подтверждение'))) return;
           const ok = await deleteRoute(r.ID);
@@ -134,23 +132,6 @@ export function initRoutes({ showToast, showConfirm }) {
       form?.reset();
       showModal();
     });
-  }
-
-  async function openEdit(id) {
-    try {
-      const [route] = await Promise.all([fetchOne(id), fillForm()]);
-      if (!route) return; // тост уже показан при !ok
-      editingId = id;
-      if (title) title.textContent = 'Изменить маршрут';
-      form.elements['name'].value        = route.Name || '';
-      form.elements['from_id'].value     = route.From?.ID ?? '';
-      form.elements['to_id'].value       = route.To?.ID ?? '';
-      form.elements['transit_id'].value  = route.Transit?.ID ?? '';
-      form.elements['eta_hours'].value   = route.ETAHours ?? '';
-      showModal();
-    } catch {
-      showToast?.('Ошибка загрузки маршрута');
-    }
   }
 
   async function fillForm() {
@@ -223,5 +204,5 @@ export function initRoutes({ showToast, showConfirm }) {
 
   btnClose?.addEventListener('click', closeModal);
 
-  return { load, openCreate, openEdit, closeModal };
+  return { load, openCreate, closeModal };
 }
