@@ -61,15 +61,12 @@ func (h *APIHandler) User(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		h.UserHandler.Get(w, r)
-	case http.MethodPost:
-
 	case http.MethodPut:
 		h.UserHandler.Put(w, r)
 	case http.MethodDelete:
-	//
+		h.UserHandler.Delete(w, r)
 	default:
 		w.Header().Set("Allow", strings.Join([]string{
-			http.MethodPost,
 			http.MethodGet,
 			http.MethodPut,
 			http.MethodDelete,
@@ -98,6 +95,7 @@ func (h *APIHandler) Recipe(w http.ResponseWriter, r *http.Request) {
 		}, ", "))
 
 		h.Helper.ClientError(w, http.StatusMethodNotAllowed)
+		return
 	}
 }
 
@@ -118,6 +116,8 @@ func (h *APIHandler) Order(w http.ResponseWriter, r *http.Request) {
 			http.MethodPut,
 			http.MethodDelete,
 		}, ", "))
+
+		h.Helper.ClientError(w, http.StatusMethodNotAllowed)
 	}
 }
 
@@ -138,6 +138,8 @@ func (h *APIHandler) Storage(w http.ResponseWriter, r *http.Request) {
 			http.MethodPut,
 			http.MethodDelete,
 		}, ", "))
+
+		h.Helper.ClientError(w, http.StatusMethodNotAllowed)
 	}
 }
 
@@ -152,6 +154,8 @@ func (h *APIHandler) Document(w http.ResponseWriter, r *http.Request) {
 			http.MethodPost,
 			http.MethodGet,
 		}, ", "))
+
+		h.Helper.ClientError(w, http.StatusMethodNotAllowed)
 	}
 }
 
@@ -169,6 +173,8 @@ func (h *APIHandler) Route(w http.ResponseWriter, r *http.Request) {
 			http.MethodPost,
 			http.MethodDelete,
 		}, ", "))
+
+		h.Helper.ClientError(w, http.StatusMethodNotAllowed)
 	}
 }
 
@@ -189,5 +195,7 @@ func (h *APIHandler) MovementOrder(w http.ResponseWriter, r *http.Request) {
 			http.MethodPut,
 			http.MethodDelete,
 		}, ", "))
+
+		h.Helper.ClientError(w, http.StatusMethodNotAllowed)
 	}
 }
