@@ -292,7 +292,7 @@ import { showConfirm } from "../../confirm.js";
     try {
       // Эндпоинт удаления.
       // Если у тебя стиль как у TMC (`/api/user?id=...`), замени на свой вариант.
-      const res = await fetch(`/api/user/${encodeURIComponent(id)}`, {
+      const res = await fetch(`/api/user?id=${encodeURIComponent(id)}`, {
         method: "DELETE",
       });
 
