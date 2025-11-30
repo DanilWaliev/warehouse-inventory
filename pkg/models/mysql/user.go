@@ -192,3 +192,15 @@ func (m *UserModel) Insert(fullname, phone, email, passwordHash, role string) er
 
 	return nil
 }
+
+func (m *UserModel) Delete(id int) error {
+	stmt := `DELETE FROM user
+	WHERE User_ID = ?`
+
+	_, err := m.DB.Exec(stmt, id)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

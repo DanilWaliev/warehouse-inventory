@@ -73,3 +73,7 @@ func (s *UserService) ReadAll() ([]*models.User, error) {
 func (s *UserService) ReadByStatus(active bool) ([]*models.User, error) {
 	return s.userModel.SelectByStatus(active)
 }
+
+func (s *UserService) Delete(id int) error {
+	return s.userModel.Delete(id)
+}

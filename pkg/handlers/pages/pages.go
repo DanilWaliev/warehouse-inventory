@@ -37,7 +37,8 @@ func (h *PageHandler) Root(w http.ResponseWriter, r *http.Request) {
 	case "storekeeper":
 		h.Movement(w, r)
 	default:
-
+		h.Helper.NotFound(w)
+		return
 	}
 }
 
