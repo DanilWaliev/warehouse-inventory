@@ -100,24 +100,6 @@ export function initTransitStock({ showToast }) {
     }
   }
 
-  // ===== Actions (Документы) =====
-  function onBuy() {
-    if (!sel?.value) { showToast?.("Выберите транзитный склад"); return; }
-    // тип документа в проекте — 'buy'
-    openDoc("buy", { storageId: sel.value }, () => load());
-  }
-
-  function onSell() {
-    if (!sel?.value) { showToast?.("Выберите транзитный склад"); return; }
-    // тип документа в проекте — 'sale'
-    openDoc("sale", { storageId: sel.value }, () => load());
-  }
-
-  function onDocs() {
-    if (!sel?.value) { showToast?.("Выберите транзитный склад"); return; }
-    openDocList({ storageId: sel.value });
-  }
-
   // ===== UI mount / unmount =====
   function showControls() {
     if (!controlPanel) return;
@@ -150,46 +132,12 @@ export function initTransitStock({ showToast }) {
       titleBlock.appendChild(sel);
     }
 
-    // справа — кнопки
-    if (!wrap) {
-      wrap = document.createElement("div");
-      wrap.id = "transit-controls";
-      wrap.className = "flex items-center";
-
-      btnBuy = document.createElement("button");
-      btnBuy.className = "btn";
-      btnBuy.textContent = "Покупка";
-      btnBuy.style.marginLeft = "var(--spacing-2)";
-      btnBuy.addEventListener("click", onBuy);
-
-      btnSell = document.createElement("button");
-      btnSell.className = "btn";
-      btnSell.textContent = "Продажа";
-      btnSell.style.marginLeft = "var(--spacing-2)";
-      btnSell.addEventListener("click", onSell);
-
-      btnDocs = document.createElement("button");
-      btnDocs.className = "btn";
-      btnDocs.textContent = "Документы";
-      btnDocs.style.marginLeft = "var(--spacing-2)";
-      btnDocs.addEventListener("click", onDocs);
-
-      wrap.appendChild(btnBuy);
-      wrap.appendChild(btnSell);
-      wrap.appendChild(btnDocs);
-      panelRight.appendChild(wrap);
-    }
-
     // первичная загрузка
     loadTransitStorages().then(load).catch(() => {});
   }
 
   function hideControls() {
     if (sel)  { sel.removeEventListener("change", load); sel.remove(); sel = null; }
-
-    if (btnBuy)  { btnBuy.removeEventListener("click", onBuy); btnBuy.remove(); btnBuy = null; }
-    if (btnSell) { btnSell.removeEventListener("click", onSell); btnSell.remove(); btnSell = null; }
-    if (btnDocs) { btnDocs.removeEventListener("click", onDocs); btnDocs.remove(); btnDocs = null; }
     if (wrap)    { wrap.remove(); wrap = null; }
 
     if (createdTitleBlock && titleBlock) {
