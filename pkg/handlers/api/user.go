@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 	"warehouse-inventory/pkg/handlers"
@@ -117,8 +116,6 @@ func (h *UserHandler) Put(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Printf("\nstatusStr: %v, id: %v\n", statusStr, id)
-
 	if statusStr == "active" {
 		err = h.UserService.SetActive(id)
 	} else {
@@ -130,4 +127,19 @@ func (h *UserHandler) Put(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.URL.Query().Get("id"))
+	if err != nil {
+		h.Helper.ClientError(w, http.StatusBadRequest)
+		return
+	}
+
+	if err := h.UserService.Delete(id); err != nil {
+		h.Helper.ServerError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
