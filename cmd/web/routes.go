@@ -12,18 +12,18 @@ func (app *application) routes() *http.ServeMux {
 
 	// Страницы
 	mux.HandleFunc("/production", app.authHandler.AccessWithRoles(app.pageHandler.Production, "admin", "prod_manager"))
-	mux.HandleFunc("/movement", app.authHandler.AccessWithRoles(app.pageHandler.Movement, "admin", "logistics"))
+	mux.HandleFunc("/movement", app.authHandler.AccessWithRoles(app.pageHandler.Movement, "admin", "logistics", "storekeeper"))
 	mux.HandleFunc("/inventory", app.authHandler.AccessWithRoles(app.pageHandler.Inventory, "admin", "storekeeper"))
 	mux.HandleFunc("/users", app.authHandler.AccessWithRoles(app.pageHandler.Users, "admin"))
 
 	// Запросы к API
-	mux.HandleFunc("/api/tmc", app.authHandler.AccessWithRoles(app.apiHandler.Component, "admin", "prod_manager"))
+	mux.HandleFunc("/api/tmc", app.authHandler.AccessWithRoles(app.apiHandler.Component, "admin", "prod_manager", "storekeeper"))
 	mux.HandleFunc("/api/recipe", app.authHandler.AccessWithRoles(app.apiHandler.Recipe, "admin", "prod_manager"))
 	mux.HandleFunc("/api/order", app.authHandler.AccessWithRoles(app.apiHandler.Order, "admin", "prod_manager"))
-	mux.HandleFunc("/api/storage", app.authHandler.AccessWithRoles(app.apiHandler.Storage, "admin", "logistics"))
-	mux.HandleFunc("/api/document", app.authHandler.AccessWithRoles(app.apiHandler.Document, "admin", "logistics"))
+	mux.HandleFunc("/api/storage", app.authHandler.AccessWithRoles(app.apiHandler.Storage, "admin", "logistics", "storekeeper"))
+	mux.HandleFunc("/api/document", app.authHandler.AccessWithRoles(app.apiHandler.Document, "admin", "storekeeper"))
 	mux.HandleFunc("/api/route", app.authHandler.AccessWithRoles(app.apiHandler.Route, "admin", "logistics"))
-	mux.HandleFunc("/api/move", app.authHandler.AccessWithRoles(app.apiHandler.MovementOrder, "admin", "logistics"))
+	mux.HandleFunc("/api/move", app.authHandler.AccessWithRoles(app.apiHandler.MovementOrder, "admin", "logistics", "storekeeper"))
 	mux.HandleFunc("/api/user", app.authHandler.AccessWithRoles(app.apiHandler.User, "admin"))
 
 	fileServer := http.FileServer(http.Dir("./ui/static"))
